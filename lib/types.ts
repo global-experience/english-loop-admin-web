@@ -2,6 +2,15 @@ export type SourceType = "KEYWORD" | "CHANNEL" | "VIDEO";
 export type VideoStatus = "CANDIDATE" | "APPROVED" | "REJECTED" | "HIDDEN";
 export type UserApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type AdminRole = "OWNER" | "ADMIN";
+export type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
+export type ExpressionStage =
+  | "NEW"
+  | "LISTENED"
+  | "UNDERSTOOD"
+  | "SHADOWED"
+  | "USED_WITH_HELP"
+  | "USED_SPONTANEOUSLY"
+  | "MASTERED";
 
 export interface AdminUser {
   id: string;
@@ -22,6 +31,9 @@ export interface AdminUser {
   approval_note: string | null;
   created_at: string;
   updated_at: string;
+  saved_feeds_count?: number;
+  saved_vocabulary_count?: number;
+  coaching_sessions_count?: number;
 }
 
 export interface AdminMember {
@@ -64,6 +76,110 @@ export interface FeedVideo {
   caption_available: boolean;
   base_score: number;
   status: VideoStatus;
+  description?: string;
+  channel_id?: string;
+  embeddable?: boolean;
+  discovery_method?: string;
+  raw_metadata?: Record<string, unknown>;
+  transcript?: {
+    exists: boolean;
+    pipeline_version: number | null;
+    segment_count: number;
+    updated_at: string | null;
+  };
+}
+
+export interface UserSavedVideo {
+  id: string;
+  status: "PROCESSING" | "READY" | "FAILED";
+  error_message: string | null;
+  youtube_job_id: string | null;
+  learning_content_id: string | null;
+  created_at: string;
+  updated_at: string;
+  video: FeedVideo;
+}
+
+export interface Expression {
+  id: string;
+  canonical_text: string;
+  korean_meaning: string;
+  example_sentence: string;
+  category: string;
+  level: string;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserVocabulary {
+  id: string;
+  current_stage: ExpressionStage;
+  first_seen_at: string;
+  last_seen_at: string;
+  last_reviewed_at: string | null;
+  next_review_at: string | null;
+  listened_count: number;
+  understood_count: number;
+  shadowed_count: number;
+  used_with_help_count: number;
+  used_spontaneously_count: number;
+  review_interval_index: number;
+  mastered_at: string | null;
+  expression: Expression;
+}
+
+export interface CoachingHistory {
+  id: string;
+  study_date: string;
+  provider: string;
+  status: string;
+  started_at: string | null;
+  voice_finished_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  report: null | {
+    id: string;
+    summary_ko: string;
+    topics: string[];
+    scores: Record<string, number>;
+    weaknesses: Array<Record<string, unknown>>;
+    next_focus: string[];
+    analysis_confidence: string;
+    created_at: string;
+  };
+}
+
+export interface YouTubeJob {
+  id: string;
+  user_id: string;
+  video_id: string;
+  source_url: string;
+  languages: string[];
+  status: JobStatus;
+  provider: string;
+  execution_target: string;
+  progress: number;
+  attempts: number;
+  claimed_by: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkerHeartbeat {
+  worker_id: string;
+  worker_type: string;
+  gpu_available: boolean;
+  model_loaded: boolean;
+  queue_length: number;
+  capabilities: Record<string, unknown>;
+  last_seen_at: string;
+  stale: boolean;
 }
 
 export interface CollectionRun {
