@@ -27,7 +27,7 @@ export default function LoginPage() {
   return (
     <main className="login-page">
       <section className="login-intro">
-        <div className="logo-mark">L</div>
+        <img src="/icons/loopine-logo.svg" alt="Loopine" className="logo-mark" />
         <p className="eyebrow">LOOPINE OPERATIONS</p>
         <h1>좋은 영어를<br />학습 피드로.</h1>
         <p>수집 소스부터 후보 검수, 일일 작업 상태까지 한곳에서 관리합니다.</p>

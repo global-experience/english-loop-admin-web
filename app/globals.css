@@ -134,13 +134,8 @@ button {
 .logo-mark {
     width: 40px;
     height: 40px;
-    /* border-radius: 12px 12px 12px 4px; */
-    display: grid;
-    place-items: center;
-    background: var(--lime);
-    color: var(--ink);
-    font-weight: 800;
-    font-size: 19px;
+    border-radius: 10px;
+    object-fit: cover;
     flex-shrink: 0;
 }
 
