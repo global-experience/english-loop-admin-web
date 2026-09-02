@@ -268,6 +268,46 @@ export function AdminDashboard() {
   );
 }
 
+function SearchForm(props: { value: string; onSearch: (value: string) => void; placeholder: string }) {
+  const { value, onSearch, placeholder } = props;
+  const [query, setQuery] = useState(value);
+
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    onSearch(query);
+  }
+
+  function clear() {
+    setQuery("");
+    onSearch("");
+  }
+
+  return (
+    <form className="search-form" onSubmit={submit}>
+      <div className="search-box">
+        <Search size={18} />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={placeholder}
+        />
+        {query ? (
+          <button type="button" className="search-clear-button" onClick={clear} title="검색어 초기화">
+            <X size={15} />
+          </button>
+        ) : null}
+      </div>
+      <button type="submit" className="primary-button search-button">
+        검색
+      </button>
+    </form>
+  );
+}
+
 function OverviewPanel({ data, onNavigate }: { data: Overview; onNavigate: (tab: Tab) => void }) {
   const metrics = [
     { label: "가입 승인 대기", value: data.users?.pending || 0, detail: "승인이 필요한 계정", icon: Users, tab: "users" as Tab },
@@ -307,7 +347,7 @@ function UsersPanel(props: { users: AdminUser[]; members: AdminMember[]; status:
     try { await apiFetch(`/api/admin/members/${member.user_id}`, { method: "DELETE" }); await reload(); } catch (error) { onError(error); } finally { setBusy(""); }
   }
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  return <section className="panel-stack"><article className="panel"><div className="panel-heading"><div><p className="eyebrow">ACCOUNT APPROVAL</p><h2>회원 가입 승인</h2></div></div><div className="filters"><div className="search-box"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="이메일 또는 이름 검색" /></div><select value={status} onChange={(event) => setStatus(event.target.value as UserApprovalStatus | "")}><option value="">모든 상태</option><option value="PENDING">승인 대기</option><option value="APPROVED">승인됨</option><option value="REJECTED">거절됨</option></select><span className="result-count">{total.toLocaleString()}명</span></div>{users.length ? <div className="user-list">{users.map((user) => <article className="user-row clickable" key={user.id} onClick={() => setDetailUserId(user.id)}><span className={`user-status status-${user.approval_status.toLowerCase()}`}>{user.approval_status}</span><div><strong>{user.display_name}</strong><span>{user.email}</span><small>{user.english_level} · {user.goals.join(", ") || "목표 없음"}{user.is_admin ? ` · ${user.admin_role} 관리자` : ""}</small></div><span className="joined-at">{dateLabel(user.created_at)}</span><div className="user-actions" onClick={(event) => event.stopPropagation()}>{user.approval_status !== "APPROVED" && <button className="approve-button" onClick={() => approve(user)} disabled={busy === user.id}><UserCheck size={17} /> 승인</button>}{user.approval_status !== "REJECTED" && <button className="reject-button" onClick={() => reject(user)} disabled={busy === user.id}><UserX size={17} /> 거절</button>}</div></article>)}</div> : <EmptyState title="조건에 맞는 사용자가 없습니다" description="필터를 바꾸거나 새 가입 요청을 기다려 주세요." />}<Pagination page={page} pages={pages} setPage={setPage} /></article><article className="panel"><div className="panel-heading"><div><p className="eyebrow">ADMIN MEMBERS</p><h2>관리자 계정</h2></div></div><form className="admin-member-form" onSubmit={addAdmin}><label>관리자 이메일<input type="email" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} placeholder="승인된 사용자 이메일" required /></label><label>권한<select value={adminRole} onChange={(event) => setAdminRole(event.target.value as AdminRole)}><option value="ADMIN">ADMIN</option><option value="OWNER">OWNER</option></select></label><button className="primary-button" disabled={busy === "add-admin"}><ShieldCheck size={17} /> 추가</button></form>{members.length ? <div className="member-list">{members.map((member) => <article className="member-row" key={member.id}><span className="member-icon" style={{ display: "flex" }}><span style={{ display: 'flex', margin: "auto" }}><ShieldCheck size={18} /></span></span><div><strong>{member.display_name}</strong><span>{member.email}</span></div><span className="type-badge type-channel">{member.role}</span><button className="reject-button" onClick={() => removeAdmin(member)} disabled={busy === member.user_id}><X size={17} /> 제거</button></article>)}</div> : <EmptyState title="등록된 관리자가 없습니다" description="최초 관리자는 부트스트랩 계정으로 접속하면 생성됩니다." />}</article>{detailUserId && <UserDetailDrawer userId={detailUserId} onClose={() => setDetailUserId("")} onSaved={reload} onError={onError} />}</section>;
+  return <section className="panel-stack"><article className="panel"><div className="panel-heading"><div><p className="eyebrow">ACCOUNT APPROVAL</p><h2>회원 가입 승인</h2></div></div><div className="filters"><SearchForm value={search} onSearch={setSearch} placeholder="이메일 또는 이름 검색" /><select value={status} onChange={(event) => setStatus(event.target.value as UserApprovalStatus | "")}><option value="">모든 상태</option><option value="PENDING">승인 대기</option><option value="APPROVED">승인됨</option><option value="REJECTED">거절됨</option></select><span className="result-count">{total.toLocaleString()}명</span></div>{users.length ? <div className="user-list">{users.map((user) => <article className="user-row clickable" key={user.id} onClick={() => setDetailUserId(user.id)}><span className={`user-status status-${user.approval_status.toLowerCase()}`}>{user.approval_status}</span><div><strong>{user.display_name}</strong><span>{user.email}</span><small>{user.english_level} · {user.goals.join(", ") || "목표 없음"}{user.is_admin ? ` · ${user.admin_role} 관리자` : ""}</small></div><span className="joined-at">{dateLabel(user.created_at)}</span><div className="user-actions" onClick={(event) => event.stopPropagation()}>{user.approval_status !== "APPROVED" && <button className="approve-button" onClick={() => approve(user)} disabled={busy === user.id}><UserCheck size={17} /> 승인</button>}{user.approval_status !== "REJECTED" && <button className="reject-button" onClick={() => reject(user)} disabled={busy === user.id}><UserX size={17} /> 거절</button>}</div></article>)}</div> : <EmptyState title="조건에 맞는 사용자가 없습니다" description="필터를 바꾸거나 새 가입 요청을 기다려 주세요." />}<Pagination page={page} pages={pages} setPage={setPage} /></article><article className="panel"><div className="panel-heading"><div><p className="eyebrow">ADMIN MEMBERS</p><h2>관리자 계정</h2></div></div><form className="admin-member-form" onSubmit={addAdmin}><label>관리자 이메일<input type="email" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} placeholder="승인된 사용자 이메일" required /></label><label>권한<select value={adminRole} onChange={(event) => setAdminRole(event.target.value as AdminRole)}><option value="ADMIN">ADMIN</option><option value="OWNER">OWNER</option></select></label><button className="primary-button" disabled={busy === "add-admin"}><ShieldCheck size={17} /> 추가</button></form>{members.length ? <div className="member-list">{members.map((member) => <article className="member-row" key={member.id}><span className="member-icon" style={{ display: "flex" }}><span style={{ display: 'flex', margin: "auto" }}><ShieldCheck size={18} /></span></span><div><strong>{member.display_name}</strong><span>{member.email}</span></div><span className="type-badge type-channel">{member.role}</span><button className="reject-button" onClick={() => removeAdmin(member)} disabled={busy === member.user_id}><X size={17} /> 제거</button></article>)}</div> : <EmptyState title="등록된 관리자가 없습니다" description="최초 관리자는 부트스트랩 계정으로 접속하면 생성됩니다." />}</article>{detailUserId && <UserDetailDrawer userId={detailUserId} onClose={() => setDetailUserId("")} onSaved={reload} onError={onError} />}</section>;
 }
 
 function UserDetailDrawer({ userId, onClose, onSaved, onError }: { userId: string; onClose: () => void; onSaved: () => Promise<void>; onError: (error: unknown) => void }) {
@@ -439,7 +479,7 @@ function VideosPanel(props: { videos: FeedVideo[]; status: VideoStatus | ""; set
     try { await apiFetch("/api/admin/feed/videos/batch-status", { method: "POST", body: JSON.stringify({ video_ids: selected, status: next }) }); setSelected([]); await reload(); onNotice(`선택 영상을 ${next} 상태로 변경했습니다.`); } catch (error) { onError(error); } finally { setBusy(""); }
   }
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  return <section className="panel-stack"><div className="filters"><div className="search-box"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="제목 또는 채널 검색" /></div><select value={status} onChange={(event) => setStatus(event.target.value as VideoStatus | "")}><option value="">모든 상태</option><option value="CANDIDATE">검수 대기</option><option value="APPROVED">승인</option><option value="REJECTED">거절</option><option value="HIDDEN">숨김</option></select><span className="result-count">{total.toLocaleString()}개</span></div>{selected.length > 0 && <div className="batch-bar"><strong>{selected.length}개 선택</strong><button disabled={busy === "batch"} onClick={() => batch("APPROVED")}>승인</button><button disabled={busy === "batch"} onClick={() => batch("HIDDEN")}>숨김</button><button disabled={busy === "batch"} onClick={() => batch("DELETE")} className="danger-text">삭제</button></div>}{videos.length ? <div className="video-grid">{videos.map((video) => <article className="video-card" key={video.id}><label className="video-check"><input type="checkbox" checked={selected.includes(video.id)} onChange={(event) => setSelected((items) => event.target.checked ? [...items, video.id] : items.filter((id) => id !== video.id))} /></label><button className="thumbnail button-reset" onClick={() => setDetailId(video.id)}><img src={video.thumbnail_url} alt="" /><span>{durationLabel(video.duration_seconds)}</span></button><div className="video-body"><div className="video-badges"><span className={statusClass(video.status)}>{video.status}</span><span className="score">{video.base_score}점</span>{video.caption_available && <span className="caption-badge">CC</span>}</div><h3>{video.title}</h3><p>{video.channel_title}</p><small>{dateLabel(video.published_at)}</small><div className="video-actions"><button className="icon-button" onClick={() => setDetailId(video.id)} aria-label="미리보기"><Eye size={17} /></button><a className="icon-button" href={video.youtube_url} target="_blank" rel="noreferrer" aria-label="YouTube에서 열기"><ExternalLink size={17} /></a><button className="reject-button" onClick={() => decide(video, "REJECTED")} disabled={busy === video.id}><X size={17} /> 제외</button><button className="approve-button" onClick={() => decide(video, "APPROVED")} disabled={busy === video.id}><Check size={17} /> 승인</button><button className="icon-danger" onClick={() => remove(video)} disabled={busy === video.id}><Trash2 size={17} /></button></div></div></article>)}</div> : <EmptyState title="조건에 맞는 영상이 없습니다" description="필터를 바꾸거나 새 후보를 수집해 보세요." />}<Pagination page={page} pages={pages} setPage={setPage} />{detailId && <VideoDetailModal videoId={detailId} onClose={() => setDetailId("")} onError={onError} />}</section>;
+  return <section className="panel-stack"><div className="filters"><SearchForm value={search} onSearch={setSearch} placeholder="제목 또는 채널 검색" /><select value={status} onChange={(event) => setStatus(event.target.value as VideoStatus | "")}><option value="">모든 상태</option><option value="CANDIDATE">검수 대기</option><option value="APPROVED">승인</option><option value="REJECTED">거절</option><option value="HIDDEN">숨김</option></select><span className="result-count">{total.toLocaleString()}개</span></div>{selected.length > 0 && <div className="batch-bar"><strong>{selected.length}개 선택</strong><button disabled={busy === "batch"} onClick={() => batch("APPROVED")}>승인</button><button disabled={busy === "batch"} onClick={() => batch("HIDDEN")}>숨김</button><button disabled={busy === "batch"} onClick={() => batch("DELETE")} className="danger-text">삭제</button></div>}{videos.length ? <div className="video-grid">{videos.map((video) => <article className="video-card" key={video.id}><label className="video-check"><input type="checkbox" checked={selected.includes(video.id)} onChange={(event) => setSelected((items) => event.target.checked ? [...items, video.id] : items.filter((id) => id !== video.id))} /></label><button className="thumbnail button-reset" onClick={() => setDetailId(video.id)}><img src={video.thumbnail_url} alt="" /><span>{durationLabel(video.duration_seconds)}</span></button><div className="video-body"><div className="video-badges"><span className={statusClass(video.status)}>{video.status}</span><span className="score">{video.base_score}점</span>{video.caption_available && <span className="caption-badge">CC</span>}</div><h3>{video.title}</h3><p>{video.channel_title}</p><small>{dateLabel(video.published_at)}</small><div className="video-actions"><button className="icon-button" onClick={() => setDetailId(video.id)} aria-label="미리보기"><Eye size={17} /></button><a className="icon-button" href={video.youtube_url} target="_blank" rel="noreferrer" aria-label="YouTube에서 열기"><ExternalLink size={17} /></a><button className="reject-button" onClick={() => decide(video, "REJECTED")} disabled={busy === video.id}><X size={17} /> 제외</button><button className="approve-button" onClick={() => decide(video, "APPROVED")} disabled={busy === video.id}><Check size={17} /> 승인</button><button className="icon-danger" onClick={() => remove(video)} disabled={busy === video.id}><Trash2 size={17} /></button></div></div></article>)}</div> : <EmptyState title="조건에 맞는 영상이 없습니다" description="필터를 바꾸거나 새 후보를 수집해 보세요." />}<Pagination page={page} pages={pages} setPage={setPage} />{detailId && <VideoDetailModal videoId={detailId} onClose={() => setDetailId("")} onError={onError} />}</section>;
 }
 
 function VideoDetailModal({ videoId, onClose, onError }: { videoId: string; onClose: () => void; onError: (error: unknown) => void }) {
@@ -456,7 +496,61 @@ function ExpressionsPanel(props: { expressions: Expression[]; total: number; pag
     if (!window.confirm(`"${expression.canonical_text}" 표현을 삭제할까요? 사용자 단어장 연결도 함께 제거됩니다.`)) return;
     try { await apiFetch(`/api/admin/expressions/${expression.id}`, { method: "DELETE" }); await reload(); } catch (error) { onError(error); }
   }
-  return <section className="panel-stack"><article className="panel"><div className="panel-heading"><div><p className="eyebrow">MASTER VOCABULARY</p><h2>표현 마스터</h2></div><button className="primary-button" onClick={() => setEditing("new")}><Plus size={17} /> 표현 추가</button></div><div className="filters"><div className="search-box"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="표현, 뜻, 예문, 카테고리 검색" /></div><select value={level} onChange={(event) => setLevel(event.target.value)}><option value="">모든 레벨</option>{LEVELS.map((item) => <option key={item}>{item}</option>)}</select><span className="result-count">{total.toLocaleString()}개</span></div>{expressions.length ? <div className="expression-table">{expressions.map((expression) => <article key={expression.id}><div><strong>{expression.canonical_text}</strong><span>{expression.korean_meaning}</span><small>{expression.example_sentence}</small></div><span className="type-badge type-channel">{expression.level}</span><span className="priority">{expression.category}</span><button className="icon-button" onClick={() => setEditing(expression)}><Pencil size={17} /></button><button className="icon-danger" onClick={() => remove(expression)}><Trash2 size={17} /></button></article>)}</div> : <EmptyState title="표현이 없습니다" description="학습에서 사용할 마스터 표현을 추가하세요." />}<Pagination page={page} pages={pages} setPage={setPage} /></article>{editing && <ExpressionModal expression={editing === "new" ? null : editing} onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await reload(); }} onError={onError} />}</section>;
+  return (
+    <section className="panel-stack">
+      <article className="panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">MASTER VOCABULARY</p>
+            <h2>표현 마스터</h2>
+          </div>
+          <button className="primary-button" onClick={() => setEditing("new")}>
+            <Plus size={17} /> 표현 추가
+          </button>
+        </div>
+        <div className="filters">
+          <SearchForm value={search} onSearch={setSearch} placeholder="표현, 뜻, 예문, 카테고리 검색" />
+          <select value={level} onChange={(event) => setLevel(event.target.value)}>
+            <option value="">모든 레벨</option>
+            {LEVELS.map((item) => <option key={item}>{item}</option>)}
+          </select>
+          <span className="result-count">{total.toLocaleString()}개</span>
+        </div>
+        {expressions.length ? (
+          <div className="expression-table">
+            {expressions.map((expression) => (
+              <article key={expression.id}>
+                <div>
+                  <strong>{expression.canonical_text}</strong>
+                  <span>{expression.korean_meaning}</span>
+                  <small>{expression.example_sentence}</small>
+                </div>
+                <span className="type-badge type-channel">{expression.level}</span>
+                <span className="priority">{expression.category}</span>
+                <button className="icon-button" onClick={() => setEditing(expression)}>
+                  <Pencil size={17} />
+                </button>
+                <button className="icon-danger" onClick={() => remove(expression)}>
+                  <Trash2 size={17} />
+                </button>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="표현이 없습니다" description="학습에서 사용할 마스터 표현을 추가하세요." />
+        )}
+        <Pagination page={page} pages={pages} setPage={setPage} />
+      </article>
+      {editing && (
+        <ExpressionModal
+          expression={editing === "new" ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={async () => { setEditing(null); await reload(); }}
+          onError={onError}
+        />
+      )}
+    </section>
+  );
 }
 
 function ExpressionModal({ expression, onClose, onSaved, onError }: { expression: Expression | null; onClose: () => void; onSaved: () => Promise<void>; onError: (error: unknown) => void }) {
