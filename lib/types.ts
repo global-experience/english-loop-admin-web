@@ -202,4 +202,107 @@ export interface Overview {
   users?: { pending: number; approved: number; rejected: number };
   admins?: number;
   last_run: CollectionRun | null;
+  activity?: LearningActivity;
+  transcripts?: TranscriptStats;
+  reports?: ReportHealth;
+}
+
+/** 실사용 지표. 값이 0 이면 학습 루프 어딘가가 조용히 끊긴 것이다. */
+export interface LearningActivity {
+  window_days: number;
+  active_today: number;
+  active_week: number;
+  routine_completions: number;
+  routine_completed: number;
+  routine_completion_rate: number | null;
+  speech_attempts: number;
+  speech_by_provider: { provider: string; count: number }[];
+  sessions_completed: number;
+}
+
+export interface TranscriptStats {
+  total: number;
+  stale: number;
+  empty: number;
+  pipeline_version: number;
+  hits: number;
+  misses: number;
+  hit_rate: number | null;
+  by_source: { source: string; count: number; hits: number }[];
+  recent_errors: { error_code: string; count: number }[];
+  error_window_days: number;
+}
+
+export interface TranscriptRow {
+  video_id: string;
+  pipeline_version: number;
+  stale: boolean;
+  source: string | null;
+  segment_count: number;
+  hit_count: number;
+  last_hit_at: string | null;
+  language_code: string | null;
+  is_generated: boolean | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TranscriptDetail extends TranscriptRow {
+  youtube_url: string;
+  translated_segment_count: number;
+  preview: {
+    sequence: number;
+    start_ms: number;
+    end_ms: number;
+    english_text: string;
+    translation: string | null;
+    translation_model: string | null;
+  }[];
+}
+
+export interface ReportHealth {
+  days: number;
+  sessions: number;
+  reports: number;
+  missing: number;
+  missing_rate: number | null;
+  /** 1 이상이면 ChatGPT 연동이 끊긴 것으로 봐야 한다. */
+  consecutive_missing_days: number;
+  daily: { study_date: string; sessions: number; reports: number; missing: number }[];
+  weakness_top: { category: string; count: number }[];
+}
+
+export interface ReportRow {
+  id: string;
+  coach_session_id: string;
+  user_id: string;
+  user_email: string;
+  user_display_name: string;
+  study_date: string;
+  provider: string;
+  session_status: string;
+  summary_ko: string;
+  topics: string[];
+  scores: Record<string, number>;
+  next_focus: string[];
+  weakness_count: number;
+  correction_count: number;
+  target_usage_count: number;
+  analysis_confidence: string;
+  rubric_version: string;
+  evidence_count: number;
+  report_received_at: string | null;
+  created_at: string;
+}
+
+export interface RuntimeSetting {
+  key: string;
+  label: string;
+  description: string;
+  kind: "bool" | "choice";
+  choices: string[];
+  value: boolean | string;
+  env_default: boolean | string;
+  /** true 면 DB 오버레이가 env 값을 덮고 있다. */
+  overridden: boolean;
 }

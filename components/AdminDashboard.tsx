@@ -2,19 +2,21 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity, BookMarked, Check, ChevronLeft, ChevronRight, CircleOff, Database, ExternalLink,
+  Activity, AlertTriangle, BookMarked, Captions, Check, ChevronLeft, ChevronRight, CircleOff,
+  ClipboardList, Database, ExternalLink,
   Eye, History, LayoutDashboard, LoaderCircle, LogOut, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, RotateCcw,
-  Search, Settings2, ShieldCheck, Sparkles, Trash2, ToggleLeft, ToggleRight, UserCheck,
-  Users, UserX, Video, X,
+  Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, ToggleLeft, ToggleRight, UserCheck,
+  Users, UserX, Video, X, Zap,
 } from "lucide-react";
 import { ApiError, apiFetch } from "@/lib/api";
 import type {
   AdminMember, AdminRole, AdminUser, CoachingHistory, CollectionRun, Expression,
-  ExpressionStage, FeedSource, FeedVideo, JobStatus, Overview, SourceType,
+  ExpressionStage, FeedSource, FeedVideo, JobStatus, Overview, ReportHealth, ReportRow,
+  RuntimeSetting, SourceType, TranscriptDetail, TranscriptRow, TranscriptStats,
   UserApprovalStatus, UserSavedVideo, UserVocabulary, VideoStatus, WorkerHeartbeat, YouTubeJob,
 } from "@/lib/types";
 
-type Tab = "overview" | "users" | "sources" | "videos" | "expressions" | "jobs" | "runs";
+type Tab = "overview" | "users" | "sources" | "videos" | "expressions" | "jobs" | "transcripts" | "reports" | "runs" | "settings";
 type UserDetailTab = "profile" | "saved" | "vocabulary" | "coaching";
 const PAGE_SIZE = 18;
 const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
@@ -30,7 +32,10 @@ const navItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "videos", label: "피드 검수", icon: Video },
   { id: "expressions", label: "표현/단어장 마스터", icon: BookMarked },
   { id: "jobs", label: "자막 작업 & 워커", icon: Activity },
+  { id: "transcripts", label: "자막 캐시", icon: Captions },
+  { id: "reports", label: "코칭 리포트", icon: ClipboardList },
   { id: "runs", label: "수집 기록", icon: History },
+  { id: "settings", label: "런타임 설정", icon: SlidersHorizontal },
 ];
 
 function durationLabel(seconds: number) {
@@ -105,6 +110,20 @@ export function AdminDashboard() {
   const [jobTotal, setJobTotal] = useState(0);
   const [jobPage, setJobPage] = useState(1);
   const [jobStatus, setJobStatus] = useState<JobStatus | "">("");
+  const [transcriptStats, setTranscriptStats] = useState<TranscriptStats | null>(null);
+  const [transcripts, setTranscripts] = useState<TranscriptRow[]>([]);
+  const [transcriptTotal, setTranscriptTotal] = useState(0);
+  const [transcriptPage, setTranscriptPage] = useState(1);
+  const [transcriptSearch, setTranscriptSearch] = useState("");
+  const [transcriptSource, setTranscriptSource] = useState("");
+  const [transcriptStale, setTranscriptStale] = useState(false);
+  const [reportHealth, setReportHealth] = useState<ReportHealth | null>(null);
+  const [reports, setReports] = useState<ReportRow[]>([]);
+  const [reportTotal, setReportTotal] = useState(0);
+  const [reportPage, setReportPage] = useState(1);
+  const [reportSearch, setReportSearch] = useState("");
+  const [reportConfidence, setReportConfidence] = useState("");
+  const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSetting[]>([]);
   const [loading, setLoading] = useState(true);
   const [collecting, setCollecting] = useState(false);
   const [error, setError] = useState("");
@@ -165,6 +184,38 @@ export function AdminDashboard() {
     setWorkers(workerData.items);
   }, [jobPage, jobStatus]);
 
+  const loadTranscripts = useCallback(async () => {
+    const params = new URLSearchParams({ page: String(transcriptPage), page_size: String(PAGE_SIZE) });
+    if (transcriptSearch.trim()) params.set("search", transcriptSearch.trim());
+    if (transcriptSource) params.set("source", transcriptSource);
+    if (transcriptStale) params.set("stale", "true");
+    const [listData, statsData] = await Promise.all([
+      apiFetch<{ items: TranscriptRow[]; total: number }>(`/api/admin/transcripts?${params}`),
+      apiFetch<TranscriptStats>("/api/admin/transcripts/stats"),
+    ]);
+    setTranscripts(listData.items);
+    setTranscriptTotal(listData.total);
+    setTranscriptStats(statsData);
+  }, [transcriptPage, transcriptSearch, transcriptSource, transcriptStale]);
+
+  const loadReports = useCallback(async () => {
+    const params = new URLSearchParams({ page: String(reportPage), page_size: String(PAGE_SIZE) });
+    if (reportSearch.trim()) params.set("search", reportSearch.trim());
+    if (reportConfidence) params.set("confidence", reportConfidence);
+    const [listData, healthData] = await Promise.all([
+      apiFetch<{ items: ReportRow[]; total: number }>(`/api/admin/reports?${params}`),
+      apiFetch<ReportHealth>("/api/admin/reports/health"),
+    ]);
+    setReports(listData.items);
+    setReportTotal(listData.total);
+    setReportHealth(healthData);
+  }, [reportPage, reportSearch, reportConfidence]);
+
+  const loadSettings = useCallback(
+    async () => setRuntimeSettings((await apiFetch<{ items: RuntimeSetting[] }>("/api/admin/settings")).items),
+    [],
+  );
+
   const activeLoader = useMemo(() => ({
     overview: loadOverview,
     users: loadUsers,
@@ -172,8 +223,11 @@ export function AdminDashboard() {
     videos: loadVideos,
     expressions: loadExpressions,
     jobs: loadJobs,
+    transcripts: loadTranscripts,
+    reports: loadReports,
     runs: loadRuns,
-  })[tab], [tab, loadOverview, loadUsers, loadSources, loadVideos, loadExpressions, loadJobs, loadRuns]);
+    settings: loadSettings,
+  })[tab], [tab, loadOverview, loadUsers, loadSources, loadVideos, loadExpressions, loadJobs, loadTranscripts, loadReports, loadRuns, loadSettings]);
 
   useEffect(() => {
     setLoading(true);
@@ -260,7 +314,10 @@ export function AdminDashboard() {
             {tab === "videos" && <VideosPanel videos={videos} status={status} setStatus={(next) => { setPage(1); setStatus(next); }} search={search} setSearch={(next) => { setPage(1); setSearch(next); }} reload={loadVideos} onError={handleError} total={total} page={page} setPage={setPage} onNotice={setNotice} />}
             {tab === "expressions" && <ExpressionsPanel expressions={expressions} total={expressionTotal} page={expressionPage} setPage={setExpressionPage} search={expressionSearch} setSearch={(next) => { setExpressionPage(1); setExpressionSearch(next); }} level={expressionLevel} setLevel={(next) => { setExpressionPage(1); setExpressionLevel(next); }} reload={loadExpressions} onError={handleError} />}
             {tab === "jobs" && <JobsPanel jobs={jobs} workers={workers} total={jobTotal} page={jobPage} setPage={setJobPage} status={jobStatus} setStatus={(next) => { setJobPage(1); setJobStatus(next); }} reload={loadJobs} onError={handleError} />}
+            {tab === "transcripts" && <TranscriptsPanel stats={transcriptStats} rows={transcripts} total={transcriptTotal} page={transcriptPage} setPage={setTranscriptPage} search={transcriptSearch} setSearch={(next) => { setTranscriptPage(1); setTranscriptSearch(next); }} source={transcriptSource} setSource={(next) => { setTranscriptPage(1); setTranscriptSource(next); }} onlyStale={transcriptStale} setOnlyStale={(next) => { setTranscriptPage(1); setTranscriptStale(next); }} reload={loadTranscripts} onError={handleError} onNotice={setNotice} />}
+            {tab === "reports" && <ReportsPanel health={reportHealth} rows={reports} total={reportTotal} page={reportPage} setPage={setReportPage} search={reportSearch} setSearch={(next) => { setReportPage(1); setReportSearch(next); }} confidence={reportConfidence} setConfidence={(next) => { setReportPage(1); setReportConfidence(next); }} reload={loadReports} />}
             {tab === "runs" && <RunsPanel runs={runs} />}
+            {tab === "settings" && <SettingsPanel items={runtimeSettings} reload={loadSettings} onError={handleError} onNotice={setNotice} />}
           </>
         )}
       </main>
@@ -309,13 +366,52 @@ function SearchForm(props: { value: string; onSearch: (value: string) => void; p
 }
 
 function OverviewPanel({ data, onNavigate }: { data: Overview; onNavigate: (tab: Tab) => void }) {
+  const activity = data.activity;
+  const transcripts = data.transcripts;
+  const reports = data.reports;
   const metrics = [
     { label: "가입 승인 대기", value: data.users?.pending || 0, detail: "승인이 필요한 계정", icon: Users, tab: "users" as Tab },
     { label: "활성 수집 소스", value: data.active_sources, detail: `전체 ${data.sources}개`, icon: Database, tab: "sources" as Tab },
     { label: "검수 대기", value: data.videos.CANDIDATE || 0, detail: "확인이 필요한 영상", icon: Activity, tab: "videos" as Tab },
     { label: "승인 영상", value: data.videos.APPROVED || 0, detail: "피드 노출 가능", icon: Check, tab: "videos" as Tab },
   ];
-  return <section className="panel-stack"><div className="metric-grid">{metrics.map((metric) => <button className="metric-card" key={metric.label} onClick={() => onNavigate(metric.tab)}><span className="metric-icon"><metric.icon size={20} /></span><span>{metric.label}</span><strong>{metric.value.toLocaleString()}</strong><small>{metric.detail}</small></button>)}</div><article className="panel"><div className="panel-heading"><div><p className="eyebrow">LAST COLLECTION</p><h2>최근 수집 상태</h2></div><button className="text-button" onClick={() => onNavigate("runs")}>전체 기록 <ChevronRight size={16} /></button></div>{data.last_run ? <RunRow run={data.last_run} /> : <EmptyState title="아직 수집 기록이 없습니다" description="수집 소스를 준비한 뒤 후보 영상 수집을 실행하세요." />}</article></section>;
+  // 수집·승인 숫자만으로는 학습이 실제로 일어나는지 알 수 없다. 아래 네 개가
+  // 각각 사용 · 비용 · 자막 파이프라인 · ChatGPT 연동의 생존 신호다.
+  const healthMetrics = activity && transcripts && reports ? [
+    {
+      label: "오늘 활동 사용자",
+      value: activity.active_today.toLocaleString(),
+      detail: `최근 ${activity.window_days}일 ${activity.active_week}명`,
+      icon: Users,
+      tab: "users" as Tab,
+      warn: activity.active_week === 0,
+    },
+    {
+      label: "루틴 완료율",
+      value: percentLabel(activity.routine_completion_rate),
+      detail: `${activity.routine_completed}/${activity.routine_completions}건 · 발화 ${activity.speech_attempts}회`,
+      icon: Check,
+      tab: "reports" as Tab,
+      warn: false,
+    },
+    {
+      label: "자막 캐시 히트율",
+      value: percentLabel(transcripts.hit_rate),
+      detail: transcripts.stale ? `구버전 ${transcripts.stale}건 재추출 중` : `캐시 ${transcripts.total}건`,
+      icon: Zap,
+      tab: "transcripts" as Tab,
+      warn: transcripts.stale > 0 || transcripts.recent_errors.length > 0,
+    },
+    {
+      label: "리포트 연속 결측",
+      value: `${reports.consecutive_missing_days}일`,
+      detail: reports.missing ? `최근 ${reports.days}일 ${reports.missing}건 누락` : "누락 없음",
+      icon: ClipboardList,
+      tab: "reports" as Tab,
+      warn: reports.consecutive_missing_days > 0,
+    },
+  ] : [];
+  return <section className="panel-stack"><div className="metric-grid">{metrics.map((metric) => <button className="metric-card" key={metric.label} onClick={() => onNavigate(metric.tab)}><span className="metric-icon"><metric.icon size={20} /></span><span>{metric.label}</span><strong>{metric.value.toLocaleString()}</strong><small>{metric.detail}</small></button>)}</div>{healthMetrics.length > 0 && <div className="metric-grid">{healthMetrics.map((metric) => <button className={metric.warn ? "metric-card warn" : "metric-card"} key={metric.label} onClick={() => onNavigate(metric.tab)}><span className="metric-icon"><metric.icon size={20} /></span><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.detail}</small></button>)}</div>}<article className="panel"><div className="panel-heading"><div><p className="eyebrow">LAST COLLECTION</p><h2>최근 수집 상태</h2></div><button className="text-button" onClick={() => onNavigate("runs")}>전체 기록 <ChevronRight size={16} /></button></div>{data.last_run ? <RunRow run={data.last_run} /> : <EmptyState title="아직 수집 기록이 없습니다" description="수집 소스를 준비한 뒤 후보 영상 수집을 실행하세요." />}</article></section>;
 }
 
 function UsersPanel(props: { users: AdminUser[]; members: AdminMember[]; status: UserApprovalStatus | ""; setStatus: (status: UserApprovalStatus | "") => void; search: string; setSearch: (value: string) => void; reload: () => Promise<void>; onError: (error: unknown) => void; total: number; page: number; setPage: (page: number) => void }) {
@@ -600,4 +696,441 @@ function Pagination({ page, pages, setPage }: { page: number; pages: number; set
 
 function EmptyState({ title, description }: { title: string; description: string }) {
   return <div className="empty-state"><Database size={28} /><strong>{title}</strong><p>{description}</p></div>;
+}
+
+/* ─────────────────────────── 자막 캐시 운영 ───────────────────────────
+ * 자막 파이프라인은 가장 비싸고 가장 자주 깨지는 경로다. 지금까지 어드민은
+ * 작업(job)만 보여줬고 결과물인 캐시는 사각지대였다: 무엇이 어떤 경로로
+ * 만들어졌는지, 재사용되고 있는지, 잘못된 걸 어떻게 버리는지 전부. */
+
+function percentLabel(value: number | null | undefined) {
+  return value === null || value === undefined ? "—" : `${Math.round(value * 1000) / 10}%`;
+}
+
+function sourceLabel(source: string | null) {
+  return ({
+    youtube_caption: "YouTube 자막",
+    "youtube_caption+whisper": "자막+Whisper 보정",
+    whisper: "로컬 Whisper",
+    groq_whisper: "Groq Whisper",
+    cloudflare_whisper: "Cloudflare Whisper",
+  } as Record<string, string>)[source || ""] || source || "알 수 없음";
+}
+
+function TranscriptsPanel(props: {
+  stats: TranscriptStats | null;
+  rows: TranscriptRow[];
+  total: number;
+  page: number;
+  setPage: (page: number) => void;
+  search: string;
+  setSearch: (value: string) => void;
+  source: string;
+  setSource: (value: string) => void;
+  onlyStale: boolean;
+  setOnlyStale: (value: boolean) => void;
+  reload: () => Promise<void>;
+  onError: (error: unknown) => void;
+  onNotice: (message: string) => void;
+}) {
+  const { stats, rows, total, page, setPage, search, setSearch, source, setSource, onlyStale, setOnlyStale, reload, onError, onNotice } = props;
+  const [detailId, setDetailId] = useState("");
+  const [busy, setBusy] = useState("");
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  async function invalidate(row: TranscriptRow) {
+    if (!window.confirm(`${row.video_id} 자막 캐시를 버릴까요? 다음 요청에서 다시 추출됩니다.`)) return;
+    setBusy(row.video_id);
+    try {
+      await apiFetch(`/api/admin/transcripts/${row.video_id}`, { method: "DELETE" });
+      onNotice(`${row.video_id} 캐시를 버렸습니다. 다음 요청에서 재추출됩니다.`);
+      await reload();
+    } catch (caught) {
+      onError(caught);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  return (
+    <section className="panel-stack">
+      {stats && (
+        <>
+          <div className="metric-grid">
+            <div className="metric-card static">
+              <span className="metric-icon"><Captions size={20} /></span>
+              <span>캐시된 자막</span>
+              <strong>{stats.total.toLocaleString()}</strong>
+              <small>파이프라인 v{stats.pipeline_version}</small>
+            </div>
+            <div className="metric-card static">
+              <span className="metric-icon"><Zap size={20} /></span>
+              <span>캐시 히트율</span>
+              <strong>{percentLabel(stats.hit_rate)}</strong>
+              <small>히트 {stats.hits.toLocaleString()} · 미스 {stats.misses.toLocaleString()}</small>
+            </div>
+            <div className={stats.stale > 0 ? "metric-card static warn" : "metric-card static"}>
+              <span className="metric-icon"><RotateCcw size={20} /></span>
+              <span>구버전 캐시</span>
+              <strong>{stats.stale.toLocaleString()}</strong>
+              <small>읽히지 않고 매번 재추출됨</small>
+            </div>
+            <div className={stats.empty > 0 ? "metric-card static warn" : "metric-card static"}>
+              <span className="metric-icon"><CircleOff size={20} /></span>
+              <span>빈 자막</span>
+              <strong>{stats.empty.toLocaleString()}</strong>
+              <small>세그먼트 0개</small>
+            </div>
+          </div>
+          <div className="split-panels">
+            <article className="panel">
+              <div className="panel-heading"><div><p className="eyebrow">EXTRACTION PATH</p><h2>추출 경로 분포</h2></div></div>
+              {stats.by_source.length ? (
+                <div className="bar-list">
+                  {stats.by_source.map((item) => (
+                    <div className="bar-row" key={item.source}>
+                      <span>{sourceLabel(item.source)}</span>
+                      <div className="bar-track"><span style={{ width: `${Math.max(3, (item.count / stats.total) * 100)}%` }} /></div>
+                      <b>{item.count.toLocaleString()}</b>
+                      <small>히트 {item.hits.toLocaleString()}</small>
+                    </div>
+                  ))}
+                </div>
+              ) : <EmptyState title="캐시된 자막이 없습니다" description="영상을 학습하면 자막이 캐시됩니다." />}
+            </article>
+            <article className="panel">
+              <div className="panel-heading">
+                <div><p className="eyebrow">RECENT FAILURES</p><h2>최근 {stats.error_window_days}일 실패 코드</h2></div>
+              </div>
+              {stats.recent_errors.length ? (
+                <div className="code-list">
+                  {stats.recent_errors.map((item) => (
+                    <div key={item.error_code}>
+                      {/* HTTP_429 / 403 이 몰려 있으면 YouTube 의 데이터센터 IP 차단이다. */}
+                      <code>{item.error_code}</code>
+                      <b>{item.count.toLocaleString()}</b>
+                    </div>
+                  ))}
+                </div>
+              ) : <EmptyState title="실패한 작업이 없습니다" description="최근 자막 추출이 모두 성공했습니다." />}
+            </article>
+          </div>
+        </>
+      )}
+      <article className="panel">
+        <div className="panel-heading">
+          <div><p className="eyebrow">TRANSCRIPT CACHE</p><h2>자막 캐시 목록</h2></div>
+          <button className="secondary-button" onClick={reload}><RefreshCw size={16} /> 새로고침</button>
+        </div>
+        <div className="filters">
+          <SearchForm value={search} onSearch={setSearch} placeholder="video ID 검색" />
+          <select value={source} onChange={(event) => setSource(event.target.value)}>
+            <option value="">모든 경로</option>
+            {(stats?.by_source || []).map((item) => (
+              <option key={item.source} value={item.source}>{sourceLabel(item.source)}</option>
+            ))}
+          </select>
+          <label className="check-filter">
+            <input type="checkbox" checked={onlyStale} onChange={(event) => setOnlyStale(event.target.checked)} />
+            구버전만
+          </label>
+          <span className="result-count">{total.toLocaleString()}개</span>
+        </div>
+        {rows.length ? (
+          <div className="transcript-list">
+            {rows.map((row) => (
+              <article className={row.stale ? "transcript-row stale" : "transcript-row"} key={row.video_id}>
+                <button className="button-reset transcript-id" onClick={() => setDetailId(row.video_id)}>
+                  <code>{row.video_id}</code>
+                  <span className="type-badge type-channel">{sourceLabel(row.source)}</span>
+                  {row.stale && <span className="status-rejected">v{row.pipeline_version} 구버전</span>}
+                </button>
+                <dl>
+                  <div><dt>세그먼트</dt><dd>{row.segment_count.toLocaleString()}</dd></div>
+                  <div><dt>히트</dt><dd>{row.hit_count.toLocaleString()}</dd></div>
+                  <div><dt>마지막 사용</dt><dd>{dateLabel(row.last_hit_at)}</dd></div>
+                  <div><dt>갱신</dt><dd>{dateLabel(row.updated_at)}</dd></div>
+                </dl>
+                <div className="row-actions">
+                  <button className="icon-button" onClick={() => setDetailId(row.video_id)} aria-label="자막 미리보기"><Eye size={17} /></button>
+                  <a className="icon-button" href={`https://www.youtube.com/watch?v=${row.video_id}`} target="_blank" rel="noreferrer" aria-label="YouTube에서 열기"><ExternalLink size={17} /></a>
+                  <button className="icon-danger" onClick={() => invalidate(row)} disabled={busy === row.video_id} aria-label="캐시 버리기"><Trash2 size={17} /></button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : <EmptyState title="조건에 맞는 자막이 없습니다" description="필터를 바꾸거나 영상을 학습해 캐시를 만들어 보세요." />}
+        <Pagination page={page} pages={pages} setPage={setPage} />
+      </article>
+      {detailId && <TranscriptDetailModal videoId={detailId} onClose={() => setDetailId("")} onError={onError} />}
+    </section>
+  );
+}
+
+function TranscriptDetailModal({ videoId, onClose, onError }: { videoId: string; onClose: () => void; onError: (error: unknown) => void }) {
+  const [detail, setDetail] = useState<TranscriptDetail | null>(null);
+
+  useEffect(() => {
+    apiFetch<TranscriptDetail>(`/api/admin/transcripts/${videoId}`).then(setDetail).catch(onError);
+  }, [videoId, onError]);
+
+  return (
+    <Modal title={`자막 ${videoId}`} onClose={onClose}>
+      {!detail ? <div className="loading-state"><LoaderCircle className="spin" /></div> : (
+        <div className="modal-body">
+          <dl className="detail-grid">
+            <div><dt>추출 경로</dt><dd>{sourceLabel(detail.source)}</dd></div>
+            <div><dt>파이프라인</dt><dd>v{detail.pipeline_version}{detail.stale ? " (구버전)" : ""}</dd></div>
+            <div><dt>세그먼트</dt><dd>{detail.segment_count.toLocaleString()}</dd></div>
+            <div><dt>번역됨</dt><dd>{detail.translated_segment_count.toLocaleString()}</dd></div>
+            <div><dt>히트</dt><dd>{detail.hit_count.toLocaleString()}</dd></div>
+            <div><dt>자동 생성</dt><dd>{detail.is_generated === null ? "—" : detail.is_generated ? "예" : "아니오"}</dd></div>
+          </dl>
+          <a className="text-button" href={detail.youtube_url} target="_blank" rel="noreferrer">
+            <ExternalLink size={14} /> YouTube에서 확인
+          </a>
+          {/* 앞 문장 몇 개만 봐도 오인식(엉뚱한 언어, 빈 텍스트)은 바로 드러난다. */}
+          <div className="segment-preview">
+            {detail.preview.map((segment) => (
+              <div key={segment.sequence}>
+                <span>{durationLabel(Math.floor(segment.start_ms / 1000))}</span>
+                <div>
+                  <strong>{segment.english_text || <em>빈 텍스트</em>}</strong>
+                  {segment.translation && <small>{segment.translation}</small>}
+                </div>
+              </div>
+            ))}
+            {!detail.preview.length && <EmptyState title="세그먼트가 없습니다" description="빈 자막입니다. 캐시를 버리고 재추출해 보세요." />}
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/* ─────────────────────────── 코칭 리포트 진단 ───────────────────────────
+ * 2026-09-04 부터 6일간 리포트가 한 건도 쌓이지 않았는데 어디에도 신호가
+ * 없었다. 세션은 정상 생성되고 있었으니 "세션 수" 만으로는 보이지 않는다.
+ * 연속 결측일이 그 장애를 당일에 드러내는 지표다. */
+
+function ReportsPanel(props: {
+  health: ReportHealth | null;
+  rows: ReportRow[];
+  total: number;
+  page: number;
+  setPage: (page: number) => void;
+  search: string;
+  setSearch: (value: string) => void;
+  confidence: string;
+  setConfidence: (value: string) => void;
+  reload: () => Promise<void>;
+}) {
+  const { health, rows, total, page, setPage, search, setSearch, confidence, setConfidence, reload } = props;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const maxSessions = Math.max(1, ...(health?.daily || []).map((day) => day.sessions));
+
+  return (
+    <section className="panel-stack">
+      {health && health.consecutive_missing_days > 0 && (
+        <div className="alert error standing">
+          <AlertTriangle size={18} />
+          <span>
+            <strong>{health.consecutive_missing_days}일 연속으로 리포트가 들어오지 않았습니다.</strong>{" "}
+            세션은 생성되는데 리포트가 없다면 ChatGPT 쪽 Action 호출이 끊긴 상태입니다.
+            Custom GPT 의 Action 키와 OpenAPI 버전을 먼저 확인하세요.
+          </span>
+        </div>
+      )}
+      {health && (
+        <>
+          <div className="metric-grid">
+            <div className="metric-card static">
+              <span className="metric-icon"><ClipboardList size={20} /></span>
+              <span>코칭 세션</span>
+              <strong>{health.sessions.toLocaleString()}</strong>
+              <small>최근 {health.days}일</small>
+            </div>
+            <div className="metric-card static">
+              <span className="metric-icon"><Check size={20} /></span>
+              <span>수신된 리포트</span>
+              <strong>{health.reports.toLocaleString()}</strong>
+              <small>최근 {health.days}일</small>
+            </div>
+            <div className={health.missing > 0 ? "metric-card static warn" : "metric-card static"}>
+              <span className="metric-icon"><CircleOff size={20} /></span>
+              <span>리포트 누락</span>
+              <strong>{health.missing.toLocaleString()}</strong>
+              <small>누락률 {percentLabel(health.missing_rate)}</small>
+            </div>
+            <div className={health.consecutive_missing_days > 0 ? "metric-card static warn" : "metric-card static"}>
+              <span className="metric-icon"><AlertTriangle size={20} /></span>
+              <span>연속 결측일</span>
+              <strong>{health.consecutive_missing_days}</strong>
+              <small>0이어야 정상</small>
+            </div>
+          </div>
+          <div className="split-panels">
+            <article className="panel">
+              <div className="panel-heading"><div><p className="eyebrow">DAILY DELIVERY</p><h2>일자별 세션 대비 리포트</h2></div></div>
+              {health.daily.length ? (
+                <div className="bar-list">
+                  {health.daily.map((day) => (
+                    <div className="bar-row" key={day.study_date}>
+                      <span>{day.study_date.slice(5)}</span>
+                      <div className="bar-track stacked">
+                        <span className="filled" style={{ width: `${(day.reports / maxSessions) * 100}%` }} />
+                        <span className="missing" style={{ width: `${(day.missing / maxSessions) * 100}%` }} />
+                      </div>
+                      <b>{day.reports}/{day.sessions}</b>
+                      <small>{day.missing ? `${day.missing} 누락` : "정상"}</small>
+                    </div>
+                  ))}
+                </div>
+              ) : <EmptyState title="코칭 세션이 없습니다" description="사용자가 ChatGPT 코치와 대화하면 기록됩니다." />}
+            </article>
+            <article className="panel">
+              <div className="panel-heading"><div><p className="eyebrow">WEAKNESS</p><h2>자주 지적된 약점</h2></div></div>
+              {health.weakness_top.length ? (
+                <div className="code-list">
+                  {health.weakness_top.map((item) => (
+                    <div key={item.category}><code>{item.category}</code><b>{item.count.toLocaleString()}</b></div>
+                  ))}
+                </div>
+              ) : <EmptyState title="집계된 약점이 없습니다" description="리포트가 쌓이면 카테고리별로 집계됩니다." />}
+            </article>
+          </div>
+        </>
+      )}
+      <article className="panel">
+        <div className="panel-heading">
+          <div><p className="eyebrow">SESSION REPORTS</p><h2>수신된 리포트</h2></div>
+          <button className="secondary-button" onClick={reload}><RefreshCw size={16} /> 새로고침</button>
+        </div>
+        <div className="filters">
+          <SearchForm value={search} onSearch={setSearch} placeholder="사용자 이메일 또는 이름" />
+          <select value={confidence} onChange={(event) => setConfidence(event.target.value)}>
+            <option value="">모든 신뢰도</option>
+            <option value="HIGH">HIGH</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="LOW">LOW</option>
+          </select>
+          <span className="result-count">{total.toLocaleString()}건</span>
+        </div>
+        {rows.length ? (
+          <div className="report-list">
+            {rows.map((row) => (
+              <article className="report-row" key={row.id}>
+                <div className="report-head">
+                  <span className="type-badge type-keyword">{row.study_date}</span>
+                  <strong>{row.user_display_name}</strong>
+                  <span>{row.user_email}</span>
+                  <span className={`status-${row.analysis_confidence.toLowerCase()}`}>{row.analysis_confidence}</span>
+                </div>
+                <p>{row.summary_ko}</p>
+                <dl>
+                  <div><dt>약점</dt><dd>{row.weakness_count}</dd></div>
+                  <div><dt>교정</dt><dd>{row.correction_count}</dd></div>
+                  <div><dt>목표 표현</dt><dd>{row.target_usage_count}</dd></div>
+                  <div><dt>근거</dt><dd>{row.evidence_count}</dd></div>
+                  <div><dt>루브릭</dt><dd>v{row.rubric_version}</dd></div>
+                </dl>
+                {row.next_focus.length > 0 && (
+                  <small>다음 초점: {row.next_focus.join(", ")}</small>
+                )}
+              </article>
+            ))}
+          </div>
+        ) : <EmptyState title="수신된 리포트가 없습니다" description="ChatGPT 코치가 대화를 마치면 리포트가 저장됩니다." />}
+        <Pagination page={page} pages={pages} setPage={setPage} />
+      </article>
+    </section>
+  );
+}
+
+/* ─────────────────────────── 런타임 설정 ───────────────────────────
+ * env 로만 관리하면 값 하나 바꿀 때마다 Render 재배포가 필요하다. YouTube
+ * 차단 대응처럼 실험이 필요한 설정은 여기서 즉시 토글한다. 화이트리스트에
+ * 있는 키만 바뀌고, 전파는 각 인스턴스의 15초 캐시 만료 뒤에 완료된다. */
+
+function SettingsPanel({ items, reload, onError, onNotice }: {
+  items: RuntimeSetting[];
+  reload: () => Promise<void>;
+  onError: (error: unknown) => void;
+  onNotice: (message: string) => void;
+}) {
+  const [busy, setBusy] = useState("");
+
+  async function apply(setting: RuntimeSetting, body: { value?: boolean | string; reset?: boolean }) {
+    setBusy(setting.key);
+    try {
+      await apiFetch(`/api/admin/settings/${setting.key}`, { method: "PATCH", body: JSON.stringify(body) });
+      onNotice(`${setting.label} 을 변경했습니다. 모든 인스턴스에 최대 15초 뒤 반영됩니다.`);
+      await reload();
+    } catch (caught) {
+      onError(caught);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  return (
+    <section className="panel-stack">
+      <article className="panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">RUNTIME OVERRIDES</p>
+            <h2>재배포 없이 바꾸는 설정</h2>
+          </div>
+          <button className="secondary-button" onClick={reload}><RefreshCw size={16} /> 새로고침</button>
+        </div>
+        <p className="panel-note">
+          env 값이 기본값이고 여기서 바꾼 값이 그 위에 덮입니다. 각 인스턴스(웹 · Render 러너 · GPU 워커)는
+          15초 캐시를 쓰므로 반영에 최대 그만큼 걸립니다.
+        </p>
+        <div className="setting-list">
+          {items.map((setting) => (
+            <article className={setting.overridden ? "setting-row overridden" : "setting-row"} key={setting.key}>
+              <div>
+                <strong>{setting.label}</strong>
+                <p>{setting.description}</p>
+                <small>
+                  <code>{setting.key}</code>
+                  {setting.overridden
+                    ? ` · env 기본값 ${String(setting.env_default)} 을 덮고 있음`
+                    : " · env 기본값 사용 중"}
+                </small>
+              </div>
+              <div className="setting-control">
+                {setting.kind === "bool" ? (
+                  <button
+                    className="icon-button"
+                    disabled={busy === setting.key}
+                    onClick={() => apply(setting, { value: !setting.value })}
+                    aria-label={setting.value ? "끄기" : "켜기"}
+                  >
+                    {setting.value ? <ToggleRight size={30} /> : <ToggleLeft size={30} />}
+                  </button>
+                ) : (
+                  <select
+                    value={String(setting.value)}
+                    disabled={busy === setting.key}
+                    onChange={(event) => apply(setting, { value: event.target.value })}
+                  >
+                    {setting.choices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
+                  </select>
+                )}
+                <button
+                  className="text-button"
+                  disabled={busy === setting.key || !setting.overridden}
+                  onClick={() => apply(setting, { reset: true })}
+                >
+                  <RotateCcw size={14} /> env 값으로
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </article>
+    </section>
+  );
 }
