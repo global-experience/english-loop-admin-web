@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Activity, AlertTriangle, BookMarked, Captions, Check, ChevronLeft, ChevronRight, CircleOff,
   ClipboardList, Database, ExternalLink,
@@ -9,6 +11,7 @@ import {
   Users, UserX, Video, X, Zap,
 } from "lucide-react";
 import { ApiError, apiFetch } from "@/lib/api";
+import { TAB_LABELS, tabHref, type Tab } from "@/lib/tabs";
 import type {
   AdminMember, AdminRole, AdminUser, CoachingHistory, CollectionRun, Expression,
   ExpressionStage, FeedSource, FeedVideo, JobStatus, Overview, ReportHealth, ReportRow,
@@ -16,7 +19,6 @@ import type {
   UserApprovalStatus, UserSavedVideo, UserVocabulary, VideoStatus, WorkerHeartbeat, YouTubeJob,
 } from "@/lib/types";
 
-type Tab = "overview" | "users" | "sources" | "videos" | "expressions" | "jobs" | "transcripts" | "reports" | "runs" | "settings";
 type UserDetailTab = "profile" | "saved" | "vocabulary" | "coaching";
 const PAGE_SIZE = 18;
 const VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
@@ -25,18 +27,20 @@ const CHANNEL_HANDLE_RE = /(?:youtube\.com\/)?@([A-Za-z0-9._-]{3,30})/;
 const LEVELS = ["A1", "A2", "B1", "B2", "C1"];
 const STAGES: ExpressionStage[] = ["NEW", "LISTENED", "UNDERSTOOD", "SHADOWED", "USED_WITH_HELP", "USED_SPONTANEOUSLY", "MASTERED"];
 
-const navItems: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: "overview", label: "대시보드", icon: LayoutDashboard },
-  { id: "users", label: "사용자 관리", icon: Users },
-  { id: "sources", label: "수집 소스", icon: Settings2 },
-  { id: "videos", label: "피드 검수", icon: Video },
-  { id: "expressions", label: "표현/단어장 마스터", icon: BookMarked },
-  { id: "jobs", label: "자막 작업 & 워커", icon: Activity },
-  { id: "transcripts", label: "자막 캐시", icon: Captions },
-  { id: "reports", label: "코칭 리포트", icon: ClipboardList },
-  { id: "runs", label: "수집 기록", icon: History },
-  { id: "settings", label: "런타임 설정", icon: SlidersHorizontal },
+/** 라벨은 lib/tabs.ts 가 갖는다. 여기서는 아이콘과 순서만 정한다. */
+const navItems: { id: Tab; icon: typeof LayoutDashboard }[] = [
+  { id: "overview", icon: LayoutDashboard },
+  { id: "users", icon: Users },
+  { id: "sources", icon: Settings2 },
+  { id: "videos", icon: Video },
+  { id: "expressions", icon: BookMarked },
+  { id: "jobs", icon: Activity },
+  { id: "transcripts", icon: Captions },
+  { id: "reports", icon: ClipboardList },
+  { id: "runs", icon: History },
+  { id: "settings", icon: SlidersHorizontal },
 ];
+
 
 function durationLabel(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -83,8 +87,8 @@ function validateSourceInput(sourceType: SourceType, value: string) {
   return { status: "OK" as const, message: "검색어로 수집됩니다." };
 }
 
-export function AdminDashboard() {
-  const [tab, setTab] = useState<Tab>("overview");
+export function AdminDashboard({ tab }: { tab: Tab }) {
+  const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [sources, setSources] = useState<FeedSource[]>([]);
@@ -128,6 +132,11 @@ export function AdminDashboard() {
   const [collecting, setCollecting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  const toggleSidebar = useCallback(() => setSidebarCollapsed((previous) => !previous), []);
+  const expandSidebar = useCallback(() => setSidebarCollapsed(false), []);
+
+  const navigate = useCallback((next: Tab) => router.push(tabHref(next)), [router]);
 
   const handleError = useCallback((caught: unknown) => {
     if (caught instanceof ApiError && caught.status === 401) {
@@ -257,7 +266,7 @@ export function AdminDashboard() {
   return (
     <div className={`admin-shell${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       <aside className="sidebar">
-        <div className="brand" onClick={() => sidebarCollapsed && setSidebarCollapsed(false)} style={{ cursor: sidebarCollapsed ? "pointer" : "default" }} title={sidebarCollapsed ? "메뉴 펼치기" : ""}>
+        <div className="brand" onClick={() => sidebarCollapsed && expandSidebar()} style={{ cursor: sidebarCollapsed ? "pointer" : "default" }} title={sidebarCollapsed ? "메뉴 펼치기" : ""}>
           <img src="/icons/loopine-logo.svg" alt="" aria-hidden="true" className="logo-mark" />
           <div className="brand-text">
             <strong>Loopine</strong>
@@ -265,7 +274,7 @@ export function AdminDashboard() {
           </div>
           <button
             className="sidebar-toggle-btn"
-            onClick={(event) => { event.stopPropagation(); setSidebarCollapsed((prev) => !prev); }}
+            onClick={(event) => { event.stopPropagation(); toggleSidebar(); }}
             title={sidebarCollapsed ? "메뉴 펼치기" : "메뉴 접기"}
           >
             {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
@@ -273,10 +282,16 @@ export function AdminDashboard() {
         </div>
         <nav>
           {navItems.map((item) => (
-            <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)} title={item.label}>
+            <Link
+              key={item.id}
+              href={tabHref(item.id)}
+              className={tab === item.id ? "active" : ""}
+              title={TAB_LABELS[item.id]}
+              aria-current={tab === item.id ? "page" : undefined}
+            >
               <item.icon size={19} />
-              <span className="nav-label">{item.label}</span>
-            </button>
+              <span className="nav-label">{TAB_LABELS[item.id]}</span>
+            </Link>
           ))}
         </nav>
         <button className="logout-button" onClick={logout} title="로그아웃">
@@ -289,14 +304,14 @@ export function AdminDashboard() {
           <div className="topbar-title-group">
             <button
               className="topbar-menu-toggle"
-              onClick={() => setSidebarCollapsed((prev) => !prev)}
+              onClick={toggleSidebar}
               title={sidebarCollapsed ? "메뉴 펼치기" : "메뉴 접기"}
             >
               {sidebarCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
             </button>
             <div>
               <p className="eyebrow">CONTENT OPERATIONS</p>
-              <h1>{navItems.find((item) => item.id === tab)?.label}</h1>
+              <h1>{TAB_LABELS[tab]}</h1>
             </div>
           </div>
           <button className="primary-button collect-button" onClick={collect} disabled={collecting}>
@@ -308,7 +323,7 @@ export function AdminDashboard() {
         {notice && <div className="alert success"><Check size={18} />{notice}<button onClick={() => setNotice("")}><X size={16} /></button></div>}
         {loading ? <div className="loading-state"><LoaderCircle className="spin" /><p>데이터를 불러오는 중입니다.</p></div> : (
           <>
-            {tab === "overview" && overview && <OverviewPanel data={overview} onNavigate={setTab} />}
+            {tab === "overview" && overview && <OverviewPanel data={overview} onNavigate={navigate} />}
             {tab === "users" && <UsersPanel users={users} members={members} status={userStatus} setStatus={(next) => { setUserPage(1); setUserStatus(next); }} search={userSearch} setSearch={(next) => { setUserPage(1); setUserSearch(next); }} reload={loadUsers} onError={handleError} total={userTotal} page={userPage} setPage={setUserPage} />}
             {tab === "sources" && <SourcesPanel sources={sources} reload={loadSources} onError={handleError} onNotice={setNotice} />}
             {tab === "videos" && <VideosPanel videos={videos} status={status} setStatus={(next) => { setPage(1); setStatus(next); }} search={search} setSearch={(next) => { setPage(1); setSearch(next); }} reload={loadVideos} onError={handleError} total={total} page={page} setPage={setPage} onNotice={setNotice} />}

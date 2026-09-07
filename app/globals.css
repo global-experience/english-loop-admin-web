@@ -144,7 +144,7 @@ button {
     gap: 6px;
 }
 
-.sidebar nav button,
+.sidebar nav a,
 .logout-button {
     border: 0;
     color: #b8c8be;
@@ -155,12 +155,14 @@ button {
     align-items: center;
     gap: 11px;
     text-align: left;
+    text-decoration: none;
+    font: inherit;
     transition: .18s ease;
     white-space: nowrap;
 }
 
-.sidebar nav button:hover,
-.sidebar nav button.active {
+.sidebar nav a:hover,
+.sidebar nav a.active {
     color: white;
     background: rgba(255, 255, 255, .1);
 }
@@ -229,7 +231,7 @@ button {
     display: none;
 }
 
-.admin-shell.sidebar-collapsed .sidebar nav button,
+.admin-shell.sidebar-collapsed .sidebar nav a,
 .admin-shell.sidebar-collapsed .logout-button {
     padding: 12px;
     justify-content: center;
@@ -1174,13 +1176,13 @@ button {
         grid-template-columns: repeat(5, 1fr);
     }
 
-    .sidebar nav button {
+    .sidebar nav a {
         justify-content: center;
         padding: 9px 4px;
         font-size: 0;
     }
 
-    .sidebar nav button svg {
+    .sidebar nav a svg {
         width: 22px;
         height: 22px;
     }
@@ -1864,8 +1866,9 @@ body:has(.modal-backdrop) {
 }
 
 @media (max-width:760px) {
+    /* 탭이 10개다. 7열이면 7+3 으로 어긋나므로 5열 두 줄로 맞춘다. */
     .sidebar nav {
-        grid-template-columns: repeat(7, 1fr);
+        grid-template-columns: repeat(5, 1fr);
     }
 
     .drawer {
