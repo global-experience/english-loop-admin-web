@@ -5,18 +5,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Activity, AlertTriangle, BookMarked, Captions, Check, ChevronLeft, ChevronRight, CircleOff,
-  ClipboardList, Database, ExternalLink,
+  ChevronDown, ChevronUp, ClipboardList, Database, ExternalLink,
   Eye, History, LayoutDashboard, LoaderCircle, LogOut, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, RotateCcw,
-  Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, ToggleLeft, ToggleRight, UserCheck,
+  Layers, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, ToggleLeft, ToggleRight, UserCheck,
   Users, UserX, Video, X, Zap,
 } from "lucide-react";
 import { ApiError, apiFetch } from "@/lib/api";
 import { TAB_LABELS, tabHref, type Tab } from "@/lib/tabs";
 import type {
   AdminMember, AdminRole, AdminUser, CoachingHistory, CollectionRun, Expression,
-  ExpressionStage, FeedSource, FeedVideo, JobStatus, Overview, ReportHealth, ReportRow,
+  ExpressionStage, FeedCategory, FeedSource, FeedVideo, JobStatus, Overview, ReportHealth, ReportRow,
   RuntimeSetting, SourceType, TranscriptDetail, TranscriptRow, TranscriptStats,
-  UserApprovalStatus, UserSavedVideo, UserVocabulary, VideoStatus, WorkerHeartbeat, YouTubeJob,
+  UserApprovalStatus, UserSavedVideo, UserVocabulary, VideoCategoryAssignment, VideoStatus, WorkerHeartbeat, YouTubeJob,
 } from "@/lib/types";
 
 type UserDetailTab = "profile" | "saved" | "vocabulary" | "coaching";
@@ -31,6 +31,7 @@ const STAGES: ExpressionStage[] = ["NEW", "LISTENED", "UNDERSTOOD", "SHADOWED", 
 const navItems: { id: Tab; icon: typeof LayoutDashboard }[] = [
   { id: "overview", icon: LayoutDashboard },
   { id: "users", icon: Users },
+  { id: "categories", icon: Layers },
   { id: "sources", icon: Settings2 },
   { id: "videos", icon: Video },
   { id: "expressions", icon: BookMarked },
@@ -92,6 +93,7 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [sources, setSources] = useState<FeedSource[]>([]);
+  const [categories, setCategories] = useState<FeedCategory[]>([]);
   const [videos, setVideos] = useState<FeedVideo[]>([]);
   const [runs, setRuns] = useState<CollectionRun[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -147,7 +149,19 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
   }, []);
 
   const loadOverview = useCallback(async () => setOverview(await apiFetch<Overview>("/api/admin/overview")), []);
-  const loadSources = useCallback(async () => setSources((await apiFetch<{ items: FeedSource[] }>("/api/admin/feed/sources")).items), []);
+  const loadCategories = useCallback(
+    async () => setCategories((await apiFetch<{ items: FeedCategory[] }>("/api/admin/feed/categories")).items),
+    [],
+  );
+  // 소스 폼이 카테고리 목록을 필요로 하므로 함께 받는다.
+  const loadSources = useCallback(async () => {
+    const [sourceData, categoryData] = await Promise.all([
+      apiFetch<{ items: FeedSource[] }>("/api/admin/feed/sources"),
+      apiFetch<{ items: FeedCategory[] }>("/api/admin/feed/categories"),
+    ]);
+    setSources(sourceData.items);
+    setCategories(categoryData.items);
+  }, []);
   const loadRuns = useCallback(async () => setRuns((await apiFetch<{ items: CollectionRun[] }>("/api/admin/feed/collection-runs")).items), []);
 
   const loadUsers = useCallback(async () => {
@@ -228,6 +242,7 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
   const activeLoader = useMemo(() => ({
     overview: loadOverview,
     users: loadUsers,
+    categories: loadCategories,
     sources: loadSources,
     videos: loadVideos,
     expressions: loadExpressions,
@@ -236,7 +251,7 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
     reports: loadReports,
     runs: loadRuns,
     settings: loadSettings,
-  })[tab], [tab, loadOverview, loadUsers, loadSources, loadVideos, loadExpressions, loadJobs, loadTranscripts, loadReports, loadRuns, loadSettings]);
+  })[tab], [tab, loadOverview, loadUsers, loadCategories, loadSources, loadVideos, loadExpressions, loadJobs, loadTranscripts, loadReports, loadRuns, loadSettings]);
 
   useEffect(() => {
     setLoading(true);
@@ -325,8 +340,9 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
           <>
             {tab === "overview" && overview && <OverviewPanel data={overview} onNavigate={navigate} />}
             {tab === "users" && <UsersPanel users={users} members={members} status={userStatus} setStatus={(next) => { setUserPage(1); setUserStatus(next); }} search={userSearch} setSearch={(next) => { setUserPage(1); setUserSearch(next); }} reload={loadUsers} onError={handleError} total={userTotal} page={userPage} setPage={setUserPage} />}
-            {tab === "sources" && <SourcesPanel sources={sources} reload={loadSources} onError={handleError} onNotice={setNotice} />}
-            {tab === "videos" && <VideosPanel videos={videos} status={status} setStatus={(next) => { setPage(1); setStatus(next); }} search={search} setSearch={(next) => { setPage(1); setSearch(next); }} reload={loadVideos} onError={handleError} total={total} page={page} setPage={setPage} onNotice={setNotice} />}
+            {tab === "categories" && <CategoriesPanel categories={categories} reload={loadCategories} onError={handleError} onNotice={setNotice} />}
+            {tab === "sources" && <SourcesPanel sources={sources} categories={categories} reload={loadSources} onError={handleError} onNotice={setNotice} />}
+            {tab === "videos" && <VideosPanel videos={videos} categories={categories} status={status} setStatus={(next) => { setPage(1); setStatus(next); }} search={search} setSearch={(next) => { setPage(1); setSearch(next); }} reload={loadVideos} onError={handleError} total={total} page={page} setPage={setPage} onNotice={setNotice} />}
             {tab === "expressions" && <ExpressionsPanel expressions={expressions} total={expressionTotal} page={expressionPage} setPage={setExpressionPage} search={expressionSearch} setSearch={(next) => { setExpressionPage(1); setExpressionSearch(next); }} level={expressionLevel} setLevel={(next) => { setExpressionPage(1); setExpressionLevel(next); }} reload={loadExpressions} onError={handleError} />}
             {tab === "jobs" && <JobsPanel jobs={jobs} workers={workers} total={jobTotal} page={jobPage} setPage={setJobPage} status={jobStatus} setStatus={(next) => { setJobPage(1); setJobStatus(next); }} reload={loadJobs} onError={handleError} />}
             {tab === "transcripts" && <TranscriptsPanel stats={transcriptStats} rows={transcripts} total={transcriptTotal} page={transcriptPage} setPage={setTranscriptPage} search={transcriptSearch} setSearch={(next) => { setTranscriptPage(1); setTranscriptSearch(next); }} source={transcriptSource} setSource={(next) => { setTranscriptPage(1); setTranscriptSource(next); }} onlyStale={transcriptStale} setOnlyStale={(next) => { setTranscriptPage(1); setTranscriptStale(next); }} reload={loadTranscripts} onError={handleError} onNotice={setNotice} />}
@@ -509,7 +525,7 @@ function UserDetailDrawer({ userId, onClose, onSaved, onError }: { userId: strin
   return <div className="modal-backdrop" onMouseDown={onClose}><aside className="drawer" onMouseDown={(event) => event.stopPropagation()}><header className="drawer-header">{user ? <><div className="drawer-avatar">{user.display_name.slice(0, 1).toUpperCase()}</div><div><p className="eyebrow">USER DETAIL</p><h2>{user.display_name}</h2><span>{user.email}</span></div><span className={`user-status status-${user.approval_status.toLowerCase()}`}>{user.approval_status}</span></> : <LoaderCircle className="spin" />}<button className="icon-button" onClick={onClose}><X size={18} /></button></header>{loading || !user ? <div className="loading-state"><LoaderCircle className="spin" /></div> : <><nav className="sub-tabs"><button className={tab === "profile" ? "active" : ""} onClick={() => setTab("profile")}>계정 프로필</button><button className={tab === "saved" ? "active" : ""} onClick={() => setTab("saved")}>찜한 피드 {saved.length}</button><button className={tab === "vocabulary" ? "active" : ""} onClick={() => setTab("vocabulary")}>개인 단어장 {vocab.length}</button><button className={tab === "coaching" ? "active" : ""} onClick={() => setTab("coaching")}>AI 코칭 리포트</button></nav>{tab === "profile" && <form className="drawer-form" onSubmit={saveProfile}><label>표시 이름<input name="display_name" defaultValue={user.display_name} required /></label><label>영어 수준<select name="english_level" defaultValue={user.english_level}>{LEVELS.map((level) => <option key={level}>{level}</option>)}</select></label><label>하루 학습 시간<input name="daily_minutes" type="number" min={30} max={240} defaultValue={user.daily_minutes} /></label><label>Custom GPT URL<input name="custom_gpt_url" type="url" defaultValue={user.custom_gpt_url || ""} /></label><label className="check-label"><input name="is_active" type="checkbox" defaultChecked={user.is_active} /> 활성 계정</label><div className="stat-row"><span>찜한 피드 <b>{user.saved_feeds_count || 0}</b></span><span>단어장 <b>{user.saved_vocabulary_count || 0}</b></span><span>코칭 <b>{user.coaching_sessions_count || 0}</b></span></div><button className="primary-button" disabled={busy === "profile"}><Check size={17} /> 저장</button></form>}{tab === "saved" && <div className="compact-table">{saved.map((item) => <article key={item.id}><img src={item.video.thumbnail_url} alt="" /><div><strong>{item.video.title}</strong><span>{item.video.channel_title} · {dateLabel(item.created_at)}</span></div><span className={statusClass(item.status)}>{item.status}</span><button className="icon-danger" onClick={() => deleteSaved(item)} disabled={busy === item.id}><Trash2 size={16} /></button></article>)}{!saved.length && <EmptyState title="찜한 영상이 없습니다" description="사용자가 피드에서 저장하면 여기에 표시됩니다." />}</div>}{tab === "vocabulary" && <div className="compact-table vocabulary-table">{vocab.map((item) => <article key={item.id}><div><strong>{item.expression.canonical_text}</strong><span>{item.expression.korean_meaning}</span><small>복습 {dateLabel(item.next_review_at)} · 듣기 {item.listened_count} · 쉐도잉 {item.shadowed_count}</small></div><span className={statusClass(item.current_stage)}>{item.current_stage}</span></article>)}{!vocab.length && <EmptyState title="저장된 표현이 없습니다" description="선택 구절 저장 후 학습하면 개인 단어장에 쌓입니다." />}</div>}{tab === "coaching" && <div className="coach-list">{coaching.map((session) => <article key={session.id}><span className={statusClass(session.status)}>{session.status}</span><div><strong>{session.study_date} · {session.provider}</strong><p>{session.report?.summary_ko || "아직 리포트가 없습니다."}</p><small>{session.report?.next_focus?.join(", ") || "다음 포커스 없음"}</small></div></article>)}{!coaching.length && <EmptyState title="코칭 기록이 없습니다" description="Custom GPT 세션 저장 후 리포트가 표시됩니다." />}</div>}</>}</aside></div>;
 }
 
-function SourcesPanel({ sources, reload, onError, onNotice }: { sources: FeedSource[]; reload: () => Promise<void>; onError: (error: unknown) => void; onNotice: (message: string) => void }) {
+function SourcesPanel({ sources, categories, reload, onError, onNotice }: { sources: FeedSource[]; categories: FeedCategory[]; reload: () => Promise<void>; onError: (error: unknown) => void; onNotice: (message: string) => void }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<FeedSource | null>(null);
   const [busy, setBusy] = useState("");
@@ -533,39 +549,46 @@ function SourcesPanel({ sources, reload, onError, onNotice }: { sources: FeedSou
     setBusy(source.id);
     try { await apiFetch(`/api/admin/feed/sources/${source.id}`, { method: "DELETE" }); await reload(); } catch (error) { onError(error); } finally { setBusy(""); }
   }
-  return <section className="panel-stack"><article className="panel"><div className="panel-heading"><div><p className="eyebrow">DISCOVERY INPUTS</p><h2>검색어·채널·직접 영상</h2></div><div className="button-row"><button className="secondary-button" onClick={seedDefaults} disabled={busy === "defaults"}><RefreshCw size={16} /> 기본 소스 채우기</button><button className="primary-button" onClick={() => { setEditing(null); setShowForm(!showForm); }}><Plus size={17} /> 소스 추가</button></div></div>{showForm && <SourceForm onSaved={async () => { setShowForm(false); await reload(); }} onError={onError} />}{sources.length ? <div className="source-list">{sources.map((source) => <article className={source.enabled ? "source-row" : "source-row disabled"} key={source.id}><span className={`type-badge type-${source.source_type.toLowerCase()}`}>{source.source_type}</span><div><strong>{source.label}</strong><span>{source.value}</span>{source.validation && <small className={`source-validation validation-${source.validation.status.toLowerCase()}`}>{source.validation.message}</small>}</div><span className="priority">우선순위 {source.priority}</span><div className="row-actions"><button className="icon-button" onClick={() => collectSource(source)} disabled={busy === `collect:${source.id}`} aria-label="이 소스만 수집"><Sparkles size={17} /></button><button className="icon-button" onClick={() => setEditing(source)} aria-label="수정"><Pencil size={17} /></button><button className="icon-button" onClick={() => toggle(source)} disabled={busy === source.id} aria-label={source.enabled ? "비활성화" : "활성화"}>{source.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}</button><button className="icon-danger" onClick={() => remove(source)} disabled={busy === source.id} aria-label="삭제"><Trash2 size={17} /></button></div></article>)}</div> : <EmptyState title="수집 소스가 없습니다" description="기본 소스를 채우거나 직접 검색어와 채널을 추가하세요." />}</article>{editing && <SourceEditModal source={editing} onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await reload(); }} onError={onError} />}</section>;
+  return <section className="panel-stack"><article className="panel"><div className="panel-heading"><div><p className="eyebrow">DISCOVERY INPUTS</p><h2>검색어·채널·직접 영상</h2></div><div className="button-row"><button className="secondary-button" onClick={seedDefaults} disabled={busy === "defaults"}><RefreshCw size={16} /> 기본 소스 채우기</button><button className="primary-button" onClick={() => { setEditing(null); setShowForm(!showForm); }}><Plus size={17} /> 소스 추가</button></div></div>{showForm && <SourceForm categories={categories} onSaved={async () => { setShowForm(false); await reload(); }} onError={onError} />}{sources.length ? <div className="source-list">{sources.map((source) => <article className={source.enabled ? "source-row" : "source-row disabled"} key={source.id}><span className={`type-badge type-${source.source_type.toLowerCase()}`}>{source.source_type}</span><div><strong>{source.label}</strong><span>{source.value}</span>{source.validation && <small className={`source-validation validation-${source.validation.status.toLowerCase()}`}>{source.validation.message}</small>}</div><span className="priority">우선순위 {source.priority}</span><div className="row-actions"><button className="icon-button" onClick={() => collectSource(source)} disabled={busy === `collect:${source.id}`} aria-label="이 소스만 수집"><Sparkles size={17} /></button><button className="icon-button" onClick={() => setEditing(source)} aria-label="수정"><Pencil size={17} /></button><button className="icon-button" onClick={() => toggle(source)} disabled={busy === source.id} aria-label={source.enabled ? "비활성화" : "활성화"}>{source.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}</button><button className="icon-danger" onClick={() => remove(source)} disabled={busy === source.id} aria-label="삭제"><Trash2 size={17} /></button></div></article>)}</div> : <EmptyState title="수집 소스가 없습니다" description="기본 소스를 채우거나 직접 검색어와 채널을 추가하세요." />}</article>{editing && <SourceEditModal source={editing} categories={categories} onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await reload(); }} onError={onError} />}</section>;
 }
 
-function SourceForm({ onSaved, onError }: { onSaved: () => Promise<void>; onError: (error: unknown) => void }) {
+function SourceForm({ categories, onSaved, onError }: { categories: FeedCategory[]; onSaved: () => Promise<void>; onError: (error: unknown) => void }) {
   const [sourceType, setSourceType] = useState<SourceType>("KEYWORD");
   const [label, setLabel] = useState("");
   const [value, setValue] = useState("");
   const [priority, setPriority] = useState(60);
   const [busy, setBusy] = useState(false);
   const validation = validateSourceInput(sourceType, value);
-  async function submit(event: FormEvent) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (validation.status === "ERROR") return onError(new Error(validation.message));
     setBusy(true);
-    try { await apiFetch("/api/admin/feed/sources", { method: "POST", body: JSON.stringify({ source_type: sourceType, label, value, priority }) }); await onSaved(); } catch (error) { onError(error); } finally { setBusy(false); }
+    const categoryIds = new FormData(event.currentTarget).getAll("source_categories").map(String);
+    try {
+      await apiFetch("/api/admin/feed/sources", {
+        method: "POST",
+        body: JSON.stringify({ source_type: sourceType, label, value, priority, category_ids: categoryIds }),
+      });
+      await onSaved();
+    } catch (error) { onError(error); } finally { setBusy(false); }
   }
-  return <form className="source-form" onSubmit={submit}><label>유형<select value={sourceType} onChange={(event) => setSourceType(event.target.value as SourceType)}><option value="KEYWORD">검색어</option><option value="CHANNEL">채널·주제</option><option value="VIDEO">직접 영상</option></select></label><label>표시 이름<input value={label} onChange={(event) => setLabel(event.target.value)} required maxLength={120} placeholder="예: 일상 영어 회화" /></label><label className="grow">검색 값<input value={value} onChange={(event) => setValue(event.target.value)} required maxLength={500} placeholder={sourceType === "KEYWORD" ? "Natural English conversation" : sourceType === "CHANNEL" ? "@handle, 채널 URL, UC... 채널 ID 또는 주제어" : "YouTube URL 또는 영상 ID"} />{value.trim() && <small className={`source-validation validation-${validation.status.toLowerCase()}`}>{validation.message}</small>}</label><label>우선순위<input type="number" value={priority} onChange={(event) => setPriority(Number(event.target.value))} min={0} max={100} /></label><button className="primary-button" disabled={busy || validation.status === "ERROR"}>{busy ? "추가 중…" : "추가"}</button></form>;
+  return <form className="source-form" onSubmit={submit}><label>유형<select value={sourceType} onChange={(event) => setSourceType(event.target.value as SourceType)}><option value="KEYWORD">검색어</option><option value="CHANNEL">채널·주제</option><option value="VIDEO">직접 영상</option></select></label><label>표시 이름<input value={label} onChange={(event) => setLabel(event.target.value)} required maxLength={120} placeholder="예: 일상 영어 회화" /></label><label className="grow">검색 값<input value={value} onChange={(event) => setValue(event.target.value)} required maxLength={500} placeholder={sourceType === "KEYWORD" ? "Natural English conversation" : sourceType === "CHANNEL" ? "@handle, 채널 URL, UC... 채널 ID 또는 주제어" : "YouTube URL 또는 영상 ID"} />{value.trim() && <small className={`source-validation validation-${validation.status.toLowerCase()}`}>{validation.message}</small>}</label><label>우선순위<input type="number" value={priority} onChange={(event) => setPriority(Number(event.target.value))} min={0} max={100} /></label><label className="source-form-categories">카탈로그 카테고리<CategoryPicker name="source_categories" categories={categories} selected={[]} /><small>이 소스로 모은 영상이 들어갈 줄입니다. 자동 분류의 1순위 근거예요.</small></label><button className="primary-button" disabled={busy || validation.status === "ERROR"}>{busy ? "추가 중…" : "추가"}</button></form>;
 }
 
-function SourceEditModal({ source, onClose, onSaved, onError }: { source: FeedSource; onClose: () => void; onSaved: () => Promise<void>; onError: (error: unknown) => void }) {
+function SourceEditModal({ source, categories, onClose, onSaved, onError }: { source: FeedSource; categories: FeedCategory[]; onClose: () => void; onSaved: () => Promise<void>; onError: (error: unknown) => void }) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     try {
-      await apiFetch(`/api/admin/feed/sources/${source.id}`, { method: "PATCH", body: JSON.stringify({ label: form.get("label"), value: form.get("value"), priority: Number(form.get("priority")), enabled: form.get("enabled") === "on" }) });
+      await apiFetch(`/api/admin/feed/sources/${source.id}`, { method: "PATCH", body: JSON.stringify({ label: form.get("label"), value: form.get("value"), priority: Number(form.get("priority")), enabled: form.get("enabled") === "on", category_ids: form.getAll("source_categories").map(String) }) });
       await onSaved();
     } catch (error) { onError(error); }
   }
-  return <Modal title="수집 소스 수정" onClose={onClose}><form className="drawer-form" onSubmit={submit}><label>표시 이름<input name="label" defaultValue={source.label} required /></label><label>값<input name="value" defaultValue={source.value} required /></label><label>우선순위<input name="priority" type="number" min={0} max={100} defaultValue={source.priority} /></label><label className="check-label"><input name="enabled" type="checkbox" defaultChecked={source.enabled} /> 활성화</label><button className="primary-button"><Check size={17} /> 저장</button></form></Modal>;
+  return <Modal title="수집 소스 수정" onClose={onClose}><form className="drawer-form" onSubmit={submit}><label>표시 이름<input name="label" defaultValue={source.label} required /></label><label>값<input name="value" defaultValue={source.value} required /></label><label>우선순위<input name="priority" type="number" min={0} max={100} defaultValue={source.priority} /></label><label className="check-label"><input name="enabled" type="checkbox" defaultChecked={source.enabled} /> 활성화</label><label className="source-form-categories">카탈로그 카테고리<CategoryPicker name="source_categories" categories={categories} selected={source.category_ids || []} /></label><button className="primary-button"><Check size={17} /> 저장</button></form></Modal>;
 }
 
-function VideosPanel(props: { videos: FeedVideo[]; status: VideoStatus | ""; setStatus: (status: VideoStatus | "") => void; search: string; setSearch: (value: string) => void; reload: () => Promise<void>; onError: (error: unknown) => void; total: number; page: number; setPage: (page: number) => void; onNotice: (message: string) => void }) {
-  const { videos, status, setStatus, search, setSearch, reload, onError, total, page, setPage, onNotice } = props;
+function VideosPanel(props: { videos: FeedVideo[]; categories: FeedCategory[]; status: VideoStatus | ""; setStatus: (status: VideoStatus | "") => void; search: string; setSearch: (value: string) => void; reload: () => Promise<void>; onError: (error: unknown) => void; total: number; page: number; setPage: (page: number) => void; onNotice: (message: string) => void }) {
+  const { videos, categories, status, setStatus, search, setSearch, reload, onError, total, page, setPage, onNotice } = props;
   const [busy, setBusy] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [detailId, setDetailId] = useState("");
@@ -590,13 +613,13 @@ function VideosPanel(props: { videos: FeedVideo[]; status: VideoStatus | ""; set
     try { await apiFetch("/api/admin/feed/videos/batch-status", { method: "POST", body: JSON.stringify({ video_ids: selected, status: next }) }); setSelected([]); await reload(); onNotice(`선택 영상을 ${next} 상태로 변경했습니다.`); } catch (error) { onError(error); } finally { setBusy(""); }
   }
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  return <section className="panel-stack"><div className="filters"><SearchForm value={search} onSearch={setSearch} placeholder="제목 또는 채널 검색" /><select value={status} onChange={(event) => setStatus(event.target.value as VideoStatus | "")}><option value="">모든 상태</option><option value="CANDIDATE">검수 대기</option><option value="APPROVED">승인</option><option value="REJECTED">거절</option><option value="HIDDEN">숨김</option></select><span className="result-count">{total.toLocaleString()}개</span></div>{selected.length > 0 && <div className="batch-bar"><strong>{selected.length}개 선택</strong><button disabled={busy === "batch"} onClick={() => batch("APPROVED")}>승인</button><button disabled={busy === "batch"} onClick={() => batch("HIDDEN")}>숨김</button><button disabled={busy === "batch"} onClick={() => batch("DELETE")} className="danger-text">삭제</button></div>}{videos.length ? <div className="video-grid">{videos.map((video) => <article className="video-card" key={video.id}><label className="video-check"><input type="checkbox" checked={selected.includes(video.id)} onChange={(event) => setSelected((items) => event.target.checked ? [...items, video.id] : items.filter((id) => id !== video.id))} /></label><button className="thumbnail button-reset" onClick={() => setDetailId(video.id)}><img src={video.thumbnail_url} alt="" /><span>{durationLabel(video.duration_seconds)}</span></button><div className="video-body"><div className="video-badges"><span className={statusClass(video.status)}>{video.status}</span><span className="score">{video.base_score}점</span>{video.caption_available && <span className="caption-badge">CC</span>}</div><h3>{video.title}</h3><p>{video.channel_title}</p><small>{dateLabel(video.published_at)}</small><div className="video-actions"><button className="icon-button" onClick={() => setDetailId(video.id)} aria-label="미리보기"><Eye size={17} /></button><a className="icon-button" href={video.youtube_url} target="_blank" rel="noreferrer" aria-label="YouTube에서 열기"><ExternalLink size={17} /></a><button className="reject-button" onClick={() => decide(video, "REJECTED")} disabled={busy === video.id}><X size={17} /> 제외</button><button className="approve-button" onClick={() => decide(video, "APPROVED")} disabled={busy === video.id}><Check size={17} /> 승인</button><button className="icon-danger" onClick={() => remove(video)} disabled={busy === video.id}><Trash2 size={17} /></button></div></div></article>)}</div> : <EmptyState title="조건에 맞는 영상이 없습니다" description="필터를 바꾸거나 새 후보를 수집해 보세요." />}<Pagination page={page} pages={pages} setPage={setPage} />{detailId && <VideoDetailModal videoId={detailId} onClose={() => setDetailId("")} onError={onError} />}</section>;
+  return <section className="panel-stack"><div className="filters"><SearchForm value={search} onSearch={setSearch} placeholder="제목 또는 채널 검색" /><select value={status} onChange={(event) => setStatus(event.target.value as VideoStatus | "")}><option value="">모든 상태</option><option value="CANDIDATE">검수 대기</option><option value="APPROVED">승인</option><option value="REJECTED">거절</option><option value="HIDDEN">숨김</option></select><span className="result-count">{total.toLocaleString()}개</span></div>{selected.length > 0 && <div className="batch-bar"><strong>{selected.length}개 선택</strong><button disabled={busy === "batch"} onClick={() => batch("APPROVED")}>승인</button><button disabled={busy === "batch"} onClick={() => batch("HIDDEN")}>숨김</button><button disabled={busy === "batch"} onClick={() => batch("DELETE")} className="danger-text">삭제</button></div>}{videos.length ? <div className="video-grid">{videos.map((video) => <article className="video-card" key={video.id}><label className="video-check"><input type="checkbox" checked={selected.includes(video.id)} onChange={(event) => setSelected((items) => event.target.checked ? [...items, video.id] : items.filter((id) => id !== video.id))} /></label><button className="thumbnail button-reset" onClick={() => setDetailId(video.id)}><img src={video.thumbnail_url} alt="" /><span>{durationLabel(video.duration_seconds)}</span></button><div className="video-body"><div className="video-badges"><span className={statusClass(video.status)}>{video.status}</span><span className="score">{video.base_score}점</span>{video.caption_available && <span className="caption-badge">CC</span>}</div><h3>{video.title}</h3><p>{video.channel_title}</p><small>{dateLabel(video.published_at)}</small><div className="video-actions"><button className="icon-button" onClick={() => setDetailId(video.id)} aria-label="미리보기"><Eye size={17} /></button><a className="icon-button" href={video.youtube_url} target="_blank" rel="noreferrer" aria-label="YouTube에서 열기"><ExternalLink size={17} /></a><button className="reject-button" onClick={() => decide(video, "REJECTED")} disabled={busy === video.id}><X size={17} /> 제외</button><button className="approve-button" onClick={() => decide(video, "APPROVED")} disabled={busy === video.id}><Check size={17} /> 승인</button><button className="icon-danger" onClick={() => remove(video)} disabled={busy === video.id}><Trash2 size={17} /></button></div></div></article>)}</div> : <EmptyState title="조건에 맞는 영상이 없습니다" description="필터를 바꾸거나 새 후보를 수집해 보세요." />}<Pagination page={page} pages={pages} setPage={setPage} />{detailId && <VideoDetailModal videoId={detailId} categories={categories} onClose={() => setDetailId("")} onError={onError} onNotice={onNotice} />}</section>;
 }
 
-function VideoDetailModal({ videoId, onClose, onError }: { videoId: string; onClose: () => void; onError: (error: unknown) => void }) {
+function VideoDetailModal({ videoId, categories, onClose, onError, onNotice }: { videoId: string; categories: FeedCategory[]; onClose: () => void; onError: (error: unknown) => void; onNotice: (message: string) => void }) {
   const [video, setVideo] = useState<FeedVideo | null>(null);
   useEffect(() => { apiFetch<FeedVideo>(`/api/admin/feed/videos/${videoId}`).then(setVideo).catch(onError); }, [videoId, onError]);
-  return <Modal title="피드 영상 미리보기" onClose={onClose}>{!video ? <div className="loading-state"><LoaderCircle className="spin" /></div> : <div className="video-detail"><iframe src={`https://www.youtube-nocookie.com/embed/${video.youtube_video_id}`} title={video.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /><div className="detail-grid"><span>상태 <b>{video.status}</b></span><span>채널 <b>{video.channel_title}</b></span><span>자막 캐시 <b>{video.transcript?.exists ? `${video.transcript.segment_count}개` : "없음"}</b></span><span>임베드 <b>{video.embeddable ? "가능" : "불가"}</b></span></div><p>{video.description || "설명이 없습니다."}</p><details><summary>Raw metadata</summary><pre>{JSON.stringify(video.raw_metadata || {}, null, 2)}</pre></details></div>}</Modal>;
+  return <Modal title="피드 영상 미리보기" onClose={onClose}>{!video ? <div className="loading-state"><LoaderCircle className="spin" /></div> : <div className="video-detail"><iframe src={`https://www.youtube-nocookie.com/embed/${video.youtube_video_id}`} title={video.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /><div className="detail-grid"><span>상태 <b>{video.status}</b></span><span>채널 <b>{video.channel_title}</b></span><span>자막 캐시 <b>{video.transcript?.exists ? `${video.transcript.segment_count}개` : "없음"}</b></span><span>임베드 <b>{video.embeddable ? "가능" : "불가"}</b></span></div><p>{video.description || "설명이 없습니다."}</p><VideoCategoryEditor videoId={videoId} categories={categories} onError={onError} onNotice={onNotice} /><details><summary>Raw metadata</summary><pre>{JSON.stringify(video.raw_metadata || {}, null, 2)}</pre></details></div>}</Modal>;
 }
 
 function ExpressionsPanel(props: { expressions: Expression[]; total: number; page: number; setPage: (page: number) => void; search: string; setSearch: (value: string) => void; level: string; setLevel: (value: string) => void; reload: () => Promise<void>; onError: (error: unknown) => void }) {
@@ -1147,5 +1170,304 @@ function SettingsPanel({ items, reload, onError, onNotice }: {
         </div>
       </article>
     </section>
+  );
+}
+
+/* ─────────────────────────── 카탈로그 카테고리 ───────────────────────────
+ * 카테고리는 소스보다 먼저 존재해야 한다. 여기서 만든 목록에서 수집 소스가
+ * 카테고리를 고르고, 그 매핑이 자동 분류의 1순위 근거가 된다.
+ * 여기 순서(sort_order)가 곧 앱 카탈로그 화면의 줄 순서다. */
+
+function CategoriesPanel({ categories, reload, onError, onNotice }: {
+  categories: FeedCategory[];
+  reload: () => Promise<void>;
+  onError: (error: unknown) => void;
+  onNotice: (message: string) => void;
+}) {
+  const [editing, setEditing] = useState<FeedCategory | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [busy, setBusy] = useState("");
+
+  async function toggle(category: FeedCategory) {
+    setBusy(category.id);
+    try {
+      await apiFetch(`/api/admin/feed/categories/${category.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ enabled: !category.enabled }),
+      });
+      await reload();
+    } catch (error) { onError(error); } finally { setBusy(""); }
+  }
+
+  async function move(category: FeedCategory, direction: -1 | 1) {
+    const ordered = [...categories];
+    const index = ordered.findIndex((item) => item.id === category.id);
+    const next = index + direction;
+    if (index < 0 || next < 0 || next >= ordered.length) return;
+    [ordered[index], ordered[next]] = [ordered[next], ordered[index]];
+    setBusy(category.id);
+    try {
+      await apiFetch("/api/admin/feed/categories/reorder", {
+        method: "POST",
+        body: JSON.stringify({ ordered_ids: ordered.map((item) => item.id) }),
+      });
+      await reload();
+    } catch (error) { onError(error); } finally { setBusy(""); }
+  }
+
+  async function remove(category: FeedCategory) {
+    setBusy(category.id);
+    try {
+      await apiFetch(`/api/admin/feed/categories/${category.id}`, { method: "DELETE" });
+      onNotice(`${category.label} 카테고리를 삭제했습니다.`);
+      await reload();
+    } catch (error) {
+      // 연결된 영상이 있으면 백엔드가 건수와 함께 막는다. 그때만 강제 삭제를 묻는다.
+      if (error instanceof ApiError && error.code === "FEED_CATEGORY_IN_USE") {
+        if (window.confirm(`${error.message}\n\n그래도 삭제할까요?`)) {
+          try {
+            await apiFetch(`/api/admin/feed/categories/${category.id}?force=true`, { method: "DELETE" });
+            onNotice(`${category.label} 카테고리를 삭제했습니다.`);
+            await reload();
+          } catch (forced) { onError(forced); }
+        }
+      } else {
+        onError(error);
+      }
+    } finally { setBusy(""); }
+  }
+
+  async function reclassify() {
+    setBusy("reclassify");
+    try {
+      const result = await apiFetch<{ videos: number; assigned: number }>(
+        "/api/admin/feed/categories/reclassify",
+        { method: "POST" },
+      );
+      onNotice(`영상 ${result.videos}건을 다시 분류했습니다. 새로 붙은 연결 ${result.assigned}건. (운영자 지정은 유지됩니다)`);
+      await reload();
+    } catch (error) { onError(error); } finally { setBusy(""); }
+  }
+
+  return (
+    <section className="panel-stack">
+      <article className="panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">CATALOG ROWS</p>
+            <h2>카탈로그 카테고리</h2>
+          </div>
+          <div className="button-row">
+            <button className="secondary-button" onClick={reclassify} disabled={busy === "reclassify"}>
+              <RefreshCw size={16} /> 자동 재분류
+            </button>
+            <button className="primary-button" onClick={() => { setEditing(null); setCreating(true); }}>
+              <Plus size={17} /> 카테고리 추가
+            </button>
+          </div>
+        </div>
+        <p className="panel-note">
+          여기 순서가 앱 카탈로그 화면의 줄 순서입니다. 수집 소스는 <b>여기 있는 카테고리만</b> 고를 수 있으니,
+          소스를 만들기 전에 먼저 카테고리를 준비하세요. 자동 재분류는 운영자가 직접 지정한 분류를 건드리지 않습니다.
+        </p>
+        {categories.length ? (
+          <div className="setting-list">
+            {categories.map((category, index) => (
+              <article className={category.enabled ? "setting-row" : "setting-row disabled"} key={category.id}>
+                <div>
+                  <strong>{category.label}</strong>
+                  <p>{category.description || "설명 없음"}</p>
+                  <small>
+                    <code>{category.slug}</code>
+                    {` · 영상 ${(category.video_count ?? 0).toLocaleString()}건`}
+                    {category.auto_rule?.youtube_category_ids?.length
+                      ? ` · YouTube 분류 ${category.auto_rule.youtube_category_ids.join(", ")}`
+                      : ""}
+                    {category.enabled ? "" : " · 숨김"}
+                  </small>
+                </div>
+                <div className="row-actions">
+                  <button className="icon-button" onClick={() => move(category, -1)} disabled={index === 0 || busy === category.id} aria-label="위로"><ChevronUp size={17} /></button>
+                  <button className="icon-button" onClick={() => move(category, 1)} disabled={index === categories.length - 1 || busy === category.id} aria-label="아래로"><ChevronDown size={17} /></button>
+                  <button className="icon-button" onClick={() => { setCreating(false); setEditing(category); }} aria-label="수정"><Pencil size={17} /></button>
+                  <button className="icon-button" onClick={() => toggle(category)} disabled={busy === category.id} aria-label={category.enabled ? "숨기기" : "보이기"}>
+                    {category.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                  </button>
+                  <button className="icon-danger" onClick={() => remove(category)} disabled={busy === category.id} aria-label="삭제"><Trash2 size={17} /></button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="카테고리가 없습니다"
+            description="카테고리를 먼저 만들어야 수집 소스에서 고를 수 있고, 앱 카탈로그에 줄이 생깁니다."
+          />
+        )}
+      </article>
+      {(creating || editing) && (
+        <CategoryModal
+          category={editing}
+          onClose={() => { setCreating(false); setEditing(null); }}
+          onSaved={async () => { setCreating(false); setEditing(null); await reload(); }}
+          onError={onError}
+        />
+      )}
+    </section>
+  );
+}
+
+function CategoryModal({ category, onClose, onSaved, onError }: {
+  category: FeedCategory | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+  onError: (error: unknown) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const youtubeIds = String(form.get("youtube_category_ids") || "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const body = {
+      slug: String(form.get("slug") || "").trim(),
+      label: String(form.get("label") || "").trim(),
+      description: String(form.get("description") || "").trim() || null,
+      auto_rule: youtubeIds.length ? { youtube_category_ids: youtubeIds } : {},
+    };
+    setBusy(true);
+    try {
+      if (category) {
+        await apiFetch(`/api/admin/feed/categories/${category.id}`, { method: "PATCH", body: JSON.stringify(body) });
+      } else {
+        await apiFetch("/api/admin/feed/categories", { method: "POST", body: JSON.stringify(body) });
+      }
+      await onSaved();
+    } catch (error) { onError(error); } finally { setBusy(false); }
+  }
+
+  return (
+    <Modal title={category ? "카테고리 수정" : "카테고리 추가"} onClose={onClose}>
+      <form className="drawer-form" onSubmit={submit}>
+        <label>
+          표시 이름
+          <input name="label" defaultValue={category?.label || ""} placeholder="일상 회화" required />
+        </label>
+        <label>
+          slug
+          <input
+            name="slug"
+            defaultValue={category?.slug || ""}
+            placeholder="daily-conversation"
+            pattern="[a-z0-9][a-z0-9-]*"
+            title="영문 소문자·숫자·하이픈만"
+            required
+          />
+          <small>URL 과 분석에 쓰는 안정 키입니다. 만든 뒤에는 되도록 바꾸지 마세요.</small>
+        </label>
+        <label>
+          설명
+          <input name="description" defaultValue={category?.description || ""} placeholder="줄 아래 보조 문구" />
+        </label>
+        <label>
+          YouTube 분류 ID
+          <input
+            name="youtube_category_ids"
+            defaultValue={(category?.auto_rule?.youtube_category_ids || []).join(", ")}
+            placeholder="23, 27"
+          />
+          <small>
+            쉼표로 구분합니다. 수집 소스 매핑이 없는 영상에만 적용되는 2순위 규칙입니다.
+            (23=코미디, 27=교육, 22=인물/블로그)
+          </small>
+        </label>
+        <button className="primary-button" disabled={busy}>
+          <Check size={17} /> 저장
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
+function CategoryPicker({ name, categories, selected }: {
+  name: string;
+  categories: FeedCategory[];
+  selected: string[];
+}) {
+  if (!categories.length) {
+    return (
+      <p className="panel-note">
+        카테고리가 없습니다. <b>카탈로그 카테고리</b> 탭에서 먼저 만들어야 여기서 고를 수 있습니다.
+      </p>
+    );
+  }
+  return (
+    <div className="category-picker">
+      {categories.map((category) => (
+        <label key={category.id} className="category-chip">
+          <input type="checkbox" name={name} value={category.id} defaultChecked={selected.includes(category.id)} />
+          <span>{category.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function VideoCategoryEditor({ videoId, categories, onError, onNotice }: {
+  videoId: string;
+  categories: FeedCategory[];
+  onError: (error: unknown) => void;
+  onNotice: (message: string) => void;
+}) {
+  const [assignments, setAssignments] = useState<VideoCategoryAssignment[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await apiFetch<{ items: VideoCategoryAssignment[]; youtube_category_id: string | null }>(
+        `/api/admin/feed/videos/${videoId}/categories`,
+      );
+      setAssignments(data.items);
+    } catch (error) { onError(error); }
+  }, [videoId, onError]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setBusy(true);
+    try {
+      await apiFetch(`/api/admin/feed/videos/${videoId}/categories`, {
+        method: "PATCH",
+        body: JSON.stringify({ category_ids: form.getAll("video_categories").map(String) }),
+      });
+      onNotice("카테고리를 지정했습니다. 자동 재분류가 이 값을 덮지 않습니다.");
+      await load();
+    } catch (error) { onError(error); } finally { setBusy(false); }
+  }
+
+  if (!assignments) return <div className="loading-state"><LoaderCircle className="spin" /></div>;
+
+  return (
+    <form className="drawer-form" onSubmit={submit}>
+      <p className="panel-note">
+        여기서 저장하면 <b>운영자 지정</b>이 되어, 이후 자동 재분류가 이 영상의 분류를 덮지 않습니다.
+      </p>
+      <CategoryPicker
+        name="video_categories"
+        categories={categories}
+        selected={assignments.map((item) => item.id)}
+      />
+      {assignments.length > 0 && (
+        <small>
+          현재: {assignments.map((item) => `${item.label}(${item.assigned_by === "ADMIN" ? "운영자" : "자동"})`).join(", ")}
+        </small>
+      )}
+      <button className="primary-button" disabled={busy}><Check size={17} /> 카테고리 저장</button>
+    </form>
   );
 }

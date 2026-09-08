@@ -12,6 +12,7 @@
 export const ADMIN_TABS = [
   "overview",
   "users",
+  "categories",
   "sources",
   "videos",
   "expressions",
@@ -30,6 +31,7 @@ export const DEFAULT_TAB: Tab = "overview";
 export const TAB_LABELS: Record<Tab, string> = {
   overview: "대시보드",
   users: "사용자 관리",
+  categories: "카탈로그 카테고리",
   sources: "수집 소스",
   videos: "피드 검수",
   expressions: "표현/단어장 마스터",

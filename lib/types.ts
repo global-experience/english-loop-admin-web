@@ -47,6 +47,28 @@ export interface AdminMember {
   updated_at: string;
 }
 
+export interface FeedCategory {
+  id: string;
+  slug: string;
+  label: string;
+  description: string | null;
+  /** 지금은 TOPIC 뿐. 난이도 같은 축을 나중에 더할 자리다. */
+  kind: string;
+  sort_order: number;
+  enabled: boolean;
+  /** 소스 매핑 외의 자동 규칙. 예: { youtube_category_ids: ["27"] } */
+  auto_rule: { youtube_category_ids?: string[] } & Record<string, unknown>;
+  video_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VideoCategoryAssignment extends FeedCategory {
+  /** ADMIN 이면 자동 재분류가 덮지 않는다. */
+  assigned_by: "AUTO" | "ADMIN";
+  confidence: number | null;
+}
+
 export interface FeedSource {
   id: string;
   source_type: SourceType;
@@ -54,6 +76,8 @@ export interface FeedSource {
   label: string;
   enabled: boolean;
   priority: number;
+  /** 이 소스로 모은 영상이 들어갈 카탈로그 줄. 자동 분류의 1순위 근거다. */
+  category_ids: string[];
   validation?: {
     status: "OK" | "WARNING" | "ERROR";
     message: string;
