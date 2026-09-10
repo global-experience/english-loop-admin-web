@@ -1084,17 +1084,6 @@ function TranscriptDetailModal({ videoId, onClose, onError }: { videoId: string;
             <div><dt>번역됨</dt><dd>{detail.translated_segment_count.toLocaleString()}</dd></div>
             <div><dt>히트</dt><dd>{detail.hit_count.toLocaleString()}</dd></div>
             <div><dt>자동 생성</dt><dd>{detail.is_generated === null ? "—" : detail.is_generated ? "예" : "아니오"}</dd></div>
-            {/* 옛 캐시와 새 파이프라인 결과는 화면 모양으로 구분이 안 된다. 여기서 본다. */}
-            <div><dt>스키마</dt><dd>{detail.transcript_schema ? `v${detail.transcript_schema} (단어 레벨)` : "구형 (재추출 전)"}</dd></div>
-            <div>
-              <dt>자막 트랙</dt>
-              <dd>
-                {detail.caption_track ?? "—"}
-                {detail.caption_track_reason === "manual_bulk_unpunctuated" && " · 수동 트랙이 덩어리라 자동으로 대체"}
-                {detail.caption_track_reason === "auto_unavailable" && " · 덩어리지만 자동 자막 없음"}
-              </dd>
-            </div>
-            <div><dt>ASR 모델</dt><dd>{detail.asr_model ?? "—"}</dd></div>
           </dl>
           <a className="text-button" href={detail.youtube_url} target="_blank" rel="noreferrer">
             <ExternalLink size={14} /> YouTube에서 확인

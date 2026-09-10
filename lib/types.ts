@@ -275,12 +275,6 @@ export interface TranscriptRow {
   last_hit_at: string | null;
   language_code: string | null;
   is_generated: boolean | null;
-  /** 새 파이프라인(2)이 만든 캐시에만 있다. 없으면 옛 캐시 — 배포 뒤 재추출이 실제로 됐는지 여기서 본다. */
-  transcript_schema: number | null;
-  /** 어느 자막 트랙을 썼나: manual | auto. reason 이 있으면 수동 트랙을 덩어리로 판정해 자동으로 돌린 것. */
-  caption_track: string | null;
-  caption_track_reason: string | null;
-  asr_model: string | null;
   created_at: string;
   updated_at: string;
 }
