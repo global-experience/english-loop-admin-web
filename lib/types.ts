@@ -1,5 +1,7 @@
 export type SourceType = "KEYWORD" | "CHANNEL" | "VIDEO";
 export type VideoStatus = "CANDIDATE" | "APPROVED" | "REJECTED" | "HIDDEN";
+/** 어드민 목록의 출처 필터. 사용자 가져오기는 검수 대상이 아니다. */
+export type VideoOrigin = "" | "ADMIN" | "USER";
 export type UserApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type AdminRole = "OWNER" | "ADMIN";
 export type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
@@ -104,6 +106,12 @@ export interface FeedVideo {
   channel_id?: string;
   embeddable?: boolean;
   discovery_method?: string;
+  /** 누가 만들었나. null 이면 수집기(어드민)다. */
+  created_by_user_id: string | null;
+  /** 표시용 "이름 (이메일)". 목록에서만 채워진다. */
+  created_by?: string | null;
+  /** 누가 볼 수 있나. 귀속과 별개다 — 승격해도 작성자는 유지된다. */
+  visibility: "PUBLIC" | "PRIVATE";
   raw_metadata?: Record<string, unknown>;
   transcript?: {
     exists: boolean;
