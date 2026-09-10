@@ -19,6 +19,7 @@ export const ADMIN_TABS = [
   "jobs",
   "transcripts",
   "reports",
+  "quality",
   "runs",
   "settings",
 ] as const;
@@ -38,6 +39,7 @@ export const TAB_LABELS: Record<Tab, string> = {
   jobs: "자막 작업 & 워커",
   transcripts: "자막 캐시",
   reports: "코칭 리포트",
+  quality: "추천 품질",
   runs: "수집 기록",
   settings: "런타임 설정",
 };

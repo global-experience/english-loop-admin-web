@@ -327,14 +327,47 @@ export interface ReportRow {
   created_at: string;
 }
 
+/**
+ * 추천 품질 지표. 랭킹을 바꾼 게 좋아졌는지 보려면 배포 전 기준선이 필요하다.
+ * `GET /api/admin/feed/quality` 의 응답 모양과 1:1 이다.
+ */
+export interface RecommendationQuality {
+  days: number;
+  views: number;
+  conversions: number;
+  /** 노출이 0이면 계산할 수 없어 null 이다. */
+  conversion_rate: number | null;
+  saves: number;
+  open_learning: number;
+  skips: number;
+  likes: number;
+  imports: number;
+  categories: {
+    slug: string;
+    label: string;
+    videos: number;
+    interested: number;
+    /** 관심자는 있는데 재고가 목표 미만 — 수집을 더 기울여야 한다. */
+    short: boolean;
+  }[];
+  quota: {
+    searches_today: number;
+    daily_cap: number;
+    per_run_budget: number;
+  };
+}
+
 export interface RuntimeSetting {
   key: string;
   label: string;
   description: string;
-  kind: "bool" | "choice";
+  kind: "bool" | "choice" | "number";
   choices: string[];
-  value: boolean | string;
-  env_default: boolean | string;
+  /** number 설정에만 값이 있다. 입력에 그대로 걸어 422 왕복을 줄인다. */
+  minimum: number | null;
+  maximum: number | null;
+  value: boolean | string | number;
+  env_default: boolean | string | number;
   /** true 면 DB 오버레이가 env 값을 덮고 있다. */
   overridden: boolean;
 }

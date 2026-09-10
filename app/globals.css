@@ -1971,6 +1971,12 @@ body:has(.modal-backdrop) {
     border-radius: 99px;
 }
 
+/* 한도에 닿았거나 재고가 모자란 줄은 색만으로 즉시 구분돼야 한다.
+   숫자를 읽어야 알 수 있으면 목록에서 문제를 지나친다. */
+.bar-track>span.warn {
+    background: var(--red);
+}
+
 /* 전달된 리포트(초록)와 누락(빨강)을 한 줄에 쌓아 비율을 바로 읽게 한다. */
 .bar-track.stacked {
     display: flex;
@@ -2261,6 +2267,24 @@ body:has(.modal-backdrop) {
 
 .setting-control select {
     min-width: 160px;
+}
+
+/* 숫자 설정: 입력 + 저장 + 허용 범위를 한 줄에 둔다.
+   범위를 옆에 적어두지 않으면 저장을 눌러 422 를 받고 나서야 한계를 알게 된다. */
+.setting-number {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.setting-number input {
+    width: 96px;
+    text-align: right;
+}
+
+.setting-number small {
+    color: var(--muted);
+    white-space: nowrap;
 }
 
 .modal-body {

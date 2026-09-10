@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Activity, AlertTriangle, BookMarked, Captions, Check, ChevronLeft, ChevronRight, CircleOff,
   ChevronDown, ChevronUp, ClipboardList, Database, ExternalLink,
-  Eye, History, LayoutDashboard, LoaderCircle, LogOut, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, RotateCcw,
+  Eye, Gauge, History, LayoutDashboard, LoaderCircle, LogOut, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, RotateCcw,
   Layers, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, ToggleLeft, ToggleRight, UserCheck,
   Users, UserX, Video, X, Zap,
 } from "lucide-react";
@@ -14,6 +14,7 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { TAB_LABELS, tabHref, type Tab } from "@/lib/tabs";
 import type {
   AdminMember, AdminRole, AdminUser, CoachingHistory, CollectionRun, Expression,
+  RecommendationQuality,
   ExpressionStage, FeedCategory, FeedSource, FeedVideo, JobStatus, Overview, ReportHealth, ReportRow,
   RuntimeSetting, SourceType, TranscriptDetail, TranscriptRow, TranscriptStats,
   UserApprovalStatus, UserSavedVideo, UserVocabulary, VideoCategoryAssignment, VideoOrigin, VideoStatus, WorkerHeartbeat, YouTubeJob,
@@ -38,6 +39,7 @@ const navItems: { id: Tab; icon: typeof LayoutDashboard }[] = [
   { id: "jobs", icon: Activity },
   { id: "transcripts", icon: Captions },
   { id: "reports", icon: ClipboardList },
+  { id: "quality", icon: Gauge },
   { id: "runs", icon: History },
   { id: "settings", icon: SlidersHorizontal },
 ];
@@ -132,6 +134,8 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
   const [reportSearch, setReportSearch] = useState("");
   const [reportConfidence, setReportConfidence] = useState("");
   const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSetting[]>([]);
+  const [quality, setQuality] = useState<RecommendationQuality | null>(null);
+  const [qualityDays, setQualityDays] = useState(7);
   const [loading, setLoading] = useState(true);
   const [collecting, setCollecting] = useState(false);
   const [error, setError] = useState("");
@@ -242,6 +246,11 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
     [],
   );
 
+  const loadQuality = useCallback(
+    async () => setQuality(await apiFetch<RecommendationQuality>(`/api/admin/feed/quality?days=${qualityDays}`)),
+    [qualityDays],
+  );
+
   const activeLoader = useMemo(() => ({
     overview: loadOverview,
     users: loadUsers,
@@ -252,9 +261,10 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
     jobs: loadJobs,
     transcripts: loadTranscripts,
     reports: loadReports,
+    quality: loadQuality,
     runs: loadRuns,
     settings: loadSettings,
-  })[tab], [tab, loadOverview, loadUsers, loadCategories, loadSources, loadVideos, loadExpressions, loadJobs, loadTranscripts, loadReports, loadRuns, loadSettings]);
+  })[tab], [tab, loadOverview, loadUsers, loadCategories, loadSources, loadVideos, loadExpressions, loadJobs, loadTranscripts, loadReports, loadQuality, loadRuns, loadSettings]);
 
   useEffect(() => {
     setLoading(true);
@@ -350,6 +360,7 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
             {tab === "jobs" && <JobsPanel jobs={jobs} workers={workers} total={jobTotal} page={jobPage} setPage={setJobPage} status={jobStatus} setStatus={(next) => { setJobPage(1); setJobStatus(next); }} reload={loadJobs} onError={handleError} />}
             {tab === "transcripts" && <TranscriptsPanel stats={transcriptStats} rows={transcripts} total={transcriptTotal} page={transcriptPage} setPage={setTranscriptPage} search={transcriptSearch} setSearch={(next) => { setTranscriptPage(1); setTranscriptSearch(next); }} source={transcriptSource} setSource={(next) => { setTranscriptPage(1); setTranscriptSource(next); }} onlyStale={transcriptStale} setOnlyStale={(next) => { setTranscriptPage(1); setTranscriptStale(next); }} reload={loadTranscripts} onError={handleError} onNotice={setNotice} />}
             {tab === "reports" && <ReportsPanel health={reportHealth} rows={reports} total={reportTotal} page={reportPage} setPage={setReportPage} search={reportSearch} setSearch={(next) => { setReportPage(1); setReportSearch(next); }} confidence={reportConfidence} setConfidence={(next) => { setReportPage(1); setReportConfidence(next); }} reload={loadReports} />}
+            {tab === "quality" && <QualityPanel data={quality} days={qualityDays} setDays={setQualityDays} reload={loadQuality} />}
             {tab === "runs" && <RunsPanel runs={runs} />}
             {tab === "settings" && <SettingsPanel items={runtimeSettings} reload={loadSettings} onError={handleError} onNotice={setNotice} />}
           </>
@@ -744,6 +755,128 @@ function JobsPanel(props: { jobs: YouTubeJob[]; workers: WorkerHeartbeat[]; tota
   return <section className="panel-stack"><div className="worker-grid">{workers.map((worker) => <article className={worker.stale ? "worker-card stale" : "worker-card"} key={worker.worker_id}><span className="metric-icon"><Activity size={18} /></span><strong>{worker.worker_id}</strong><small>{worker.worker_type} · {worker.stale ? "오프라인 의심" : "활성"}</small><div className="detail-grid"><span>GPU <b>{worker.gpu_available ? "OK" : "NO"}</b></span><span>모델 <b>{worker.model_loaded ? "LOADED" : "대기"}</b></span><span>큐 <b>{worker.queue_length}</b></span><span>마지막 <b>{dateLabel(worker.last_seen_at)}</b></span></div></article>)}{!workers.length && <article className="panel"><EmptyState title="워커 하트비트가 없습니다" description="GPU worker가 켜지면 상태가 표시됩니다." /></article>}</div><article className="panel"><div className="panel-heading"><div><p className="eyebrow">YOUTUBE JOBS</p><h2>자막 추출 작업</h2></div><button className="secondary-button" onClick={reload}><RefreshCw size={16} /> 새로고침</button></div><div className="filters"><select value={status} onChange={(event) => setStatus(event.target.value as JobStatus | "")}><option value="">모든 상태</option><option value="QUEUED">QUEUED</option><option value="PROCESSING">PROCESSING</option><option value="COMPLETED">COMPLETED</option><option value="FAILED">FAILED</option></select><span className="result-count">{total.toLocaleString()}개</span></div><div className="jobs-table">{jobs.map((job) => <article key={job.id}><div><strong>{job.video_id}</strong><span>{job.provider} · {job.execution_target} · attempts {job.attempts}</span>{job.error_message && <small>{job.error_code}: {job.error_message}</small>}</div><div className="progress-bar"><span style={{ width: `${Math.max(0, Math.min(100, job.progress))}%` }} /></div><span className={statusClass(job.status)}>{job.status}</span><button className="secondary-button" onClick={() => retry(job)} disabled={job.status !== "FAILED"}><RotateCcw size={16} /> Retry</button></article>)}{!jobs.length && <EmptyState title="작업 기록이 없습니다" description="피드 저장/자막 요청 시 작업이 생성됩니다." />}</div><Pagination page={page} pages={pages} setPage={setPage} /></article></section>;
 }
 
+/* ─────────────────────────── 추천 품질 ───────────────────────────
+ * 랭킹 가중치는 실제 데이터를 보고 몇 번 고치게 된다. 그런데 "좋아졌는지" 를
+ * 볼 수 없으면 다음에도 감으로 조정하게 된다. 여기 네 지표가 그 판단 근거다:
+ * 전환율(추천이 학습으로 이어지는지) · 카테고리별 재고(수집이 수요를 따라가는지)
+ * · 쿼터(수집 가드가 도는지) · 신호 분포(가중치를 검증할 데이터가 있는지).
+ *
+ * 가중치를 바꾸기 **전에** 전환율을 적어 두어야 비교 대상이 생긴다. */
+
+const QUALITY_WINDOWS = [7, 14, 30];
+
+function QualityPanel({ data, days, setDays, reload }: {
+  data: RecommendationQuality | null;
+  days: number;
+  setDays: (days: number) => void;
+  reload: () => Promise<void>;
+}) {
+  if (!data) return <EmptyState title="지표를 불러오지 못했습니다" description="새로고침 후에도 비어 있으면 백엔드 로그를 확인하세요." />;
+
+  const quotaRatio = data.quota.daily_cap ? data.quota.searches_today / data.quota.daily_cap : 0;
+  // 재고와 관심자는 단위가 달라 한 막대에 쌓으면 비율이 거짓이 된다.
+  // 막대는 재고만 그리고, 관심자는 숫자로 옆에 둔다.
+  const maxVideos = Math.max(1, ...data.categories.map((row) => row.videos));
+
+  return (
+    <section className="panel-stack">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">RECOMMENDATION QUALITY</p>
+          <h2>최근 {data.days}일</h2>
+        </div>
+        <div className="setting-control" style={{ justifyItems: "end" }}>
+          <select value={days} onChange={(event) => setDays(Number(event.target.value))}>
+            {QUALITY_WINDOWS.map((window) => <option key={window} value={window}>최근 {window}일</option>)}
+          </select>
+          <button className="secondary-button" onClick={reload}><RefreshCw size={16} /> 새로고침</button>
+        </div>
+      </div>
+
+      {data.views === 0 && (
+        <div className="alert error standing">
+          <AlertTriangle size={18} />
+          <span>
+            <strong>이 기간에 피드 노출이 없습니다.</strong>{" "}
+            전환율을 계산할 수 없어 랭킹 변경의 기준선을 잡을 수 없습니다.
+            영상이 승인돼 있고 앱이 <code>VIEW</code> 이벤트를 보내는지 먼저 확인하세요.
+          </span>
+        </div>
+      )}
+
+      <div className="metric-grid">
+        <div className="metric-card static">
+          <span className="metric-icon"><Gauge size={20} /></span>
+          <span>피드 전환율</span>
+          <strong>{percentLabel(data.conversion_rate)}</strong>
+          <small>(찜 + 학습 시작) / 노출</small>
+        </div>
+        <div className="metric-card static">
+          <span className="metric-icon"><Eye size={20} /></span>
+          <span>노출</span>
+          <strong>{data.views.toLocaleString()}</strong>
+          <small>스킵 {data.skips.toLocaleString()}</small>
+        </div>
+        <div className="metric-card static">
+          <span className="metric-icon"><BookMarked size={20} /></span>
+          <span>전환</span>
+          <strong>{data.conversions.toLocaleString()}</strong>
+          <small>찜 {data.saves.toLocaleString()} · 학습 {data.open_learning.toLocaleString()}</small>
+        </div>
+        <div className={data.likes + data.imports === 0 ? "metric-card static warn" : "metric-card static"}>
+          <span className="metric-icon"><Sparkles size={20} /></span>
+          <span>랭킹 신호</span>
+          <strong>{(data.likes + data.imports).toLocaleString()}</strong>
+          <small>하트 {data.likes.toLocaleString()} · 가져오기 {data.imports.toLocaleString()}</small>
+        </div>
+      </div>
+
+      <div className="split-panels">
+        <article className="panel">
+          <div className="panel-heading"><div><p className="eyebrow">INVENTORY VS DEMAND</p><h2>카테고리별 재고와 관심자</h2></div></div>
+          <p className="panel-note">
+            관심자는 있는데 재고가 모자란 줄이 <strong>부족</strong>으로 표시됩니다. 그 카테고리를
+            노리는 수집 소스를 늘리거나, 소스의 카테고리 매핑을 확인하세요.
+          </p>
+          {data.categories.length ? (
+            <div className="bar-list">
+              {data.categories.map((row) => (
+                <div className="bar-row" key={row.slug}>
+                  <span>{row.label}</span>
+                  <div className="bar-track">
+                    <span className={row.short ? "warn" : undefined} style={{ width: `${(row.videos / maxVideos) * 100}%` }} />
+                  </div>
+                  <b>{row.videos}</b>
+                  <small>{row.short ? `관심 ${row.interested} · 부족` : `관심 ${row.interested}`}</small>
+                </div>
+              ))}
+            </div>
+          ) : <EmptyState title="카테고리가 없습니다" description="카탈로그 카테고리 탭에서 먼저 만들어야 합니다." />}
+        </article>
+
+        <article className="panel">
+          <div className="panel-heading"><div><p className="eyebrow">YOUTUBE QUOTA</p><h2>오늘 검색 사용량</h2></div></div>
+          <p className="panel-note">
+            <code>search.list</code> 1회는 100유닛이고 하루 한도는 10,000유닛입니다. 상한에 닿으면
+            수집은 실패가 아니라 <strong>건너뜀</strong>으로 기록되고, 사용자가 링크를 붙일 때 쓰는
+            <code>videos.list</code> 몫이 남습니다. 상한은 런타임 설정 탭에서 바꿉니다.
+          </p>
+          <div className="bar-list">
+            <div className="bar-row">
+              <span>오늘 검색</span>
+              <div className="bar-track">
+                <span className={quotaRatio >= 1 ? "warn" : undefined} style={{ width: `${Math.min(quotaRatio, 1) * 100}%` }} />
+              </div>
+              <b>{data.quota.searches_today}/{data.quota.daily_cap}</b>
+              <small>1회 수집 예산 {data.quota.per_run_budget}</small>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+  );
+}
+
 function RunsPanel({ runs }: { runs: CollectionRun[] }) {
   return <article className="panel"><div className="panel-heading"><div><p className="eyebrow">COLLECTION HISTORY</p><h2>후보 수집 실행 기록</h2></div></div>{runs.length ? <div className="run-list">{runs.map((run) => <RunRow key={run.id} run={run} />)}</div> : <EmptyState title="수집 기록이 없습니다" description="첫 후보 수집을 실행하면 결과가 여기에 표시됩니다." />}</article>;
 }
@@ -1126,7 +1259,7 @@ function SettingsPanel({ items, reload, onError, onNotice }: {
 }) {
   const [busy, setBusy] = useState("");
 
-  async function apply(setting: RuntimeSetting, body: { value?: boolean | string; reset?: boolean }) {
+  async function apply(setting: RuntimeSetting, body: { value?: boolean | string | number; reset?: boolean }) {
     setBusy(setting.key);
     try {
       await apiFetch(`/api/admin/settings/${setting.key}`, { method: "PATCH", body: JSON.stringify(body) });
@@ -1176,6 +1309,12 @@ function SettingsPanel({ items, reload, onError, onNotice }: {
                   >
                     {setting.value ? <ToggleRight size={30} /> : <ToggleLeft size={30} />}
                   </button>
+                ) : setting.kind === "number" ? (
+                  <NumberSettingInput
+                    setting={setting}
+                    busy={busy === setting.key}
+                    onApply={(next) => apply(setting, { value: next })}
+                  />
                 ) : (
                   <select
                     value={String(setting.value)}
@@ -1198,6 +1337,53 @@ function SettingsPanel({ items, reload, onError, onNotice }: {
         </div>
       </article>
     </section>
+  );
+}
+
+/* 숫자 설정은 타이핑마다 PATCH 를 보내면 안 된다(중간값 8 → 85 처럼 범위를 벗어난
+ * 값이 그대로 저장된다). 로컬 상태로 들고 있다가 저장을 누를 때만 보낸다. */
+
+function NumberSettingInput({ setting, busy, onApply }: {
+  setting: RuntimeSetting;
+  busy: boolean;
+  onApply: (value: number) => void;
+}) {
+  const current = Number(setting.value);
+  const [draft, setDraft] = useState(String(current));
+
+  // 저장·초기화 뒤 목록이 다시 로드되면 서버 값으로 맞춘다.
+  useEffect(() => setDraft(String(Number(setting.value))), [setting.value]);
+
+  const parsed = Number(draft);
+  const outOfRange =
+    (setting.minimum !== null && parsed < setting.minimum) ||
+    (setting.maximum !== null && parsed > setting.maximum);
+  const invalid = draft.trim() === "" || Number.isNaN(parsed) || outOfRange;
+  const dirty = !invalid && parsed !== current;
+
+  return (
+    <div className="setting-number">
+      <input
+        type="number"
+        value={draft}
+        step="any"
+        min={setting.minimum ?? undefined}
+        max={setting.maximum ?? undefined}
+        disabled={busy}
+        aria-label={setting.label}
+        aria-invalid={invalid}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && dirty) onApply(parsed);
+        }}
+      />
+      <button className="secondary-button" disabled={busy || !dirty} onClick={() => onApply(parsed)}>
+        저장
+      </button>
+      <small>
+        {setting.minimum ?? "-"} ~ {setting.maximum ?? "-"}
+      </small>
+    </div>
   );
 }
 
