@@ -1489,6 +1489,49 @@ button {
     background: #fff7f5;
 }
 
+.select-all-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 44px;
+    padding: 0 13px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: white;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .15s ease;
+}
+
+.select-all-button:hover:not(:disabled) {
+    border-color: var(--green);
+    color: var(--green);
+    background: #f4f8f2;
+}
+
+.select-all-button.selected {
+    border-color: var(--green);
+    background: #eaf4e6;
+    color: var(--green);
+}
+
+.select-all-button:disabled {
+    opacity: .5;
+    cursor: default;
+}
+
+.batch-bar .select-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    margin-right: 4px;
+    cursor: pointer;
+}
+
 body:has(.modal-backdrop) {
     overflow: hidden;
     overscroll-behavior: none;

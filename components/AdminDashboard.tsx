@@ -4,10 +4,10 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  Activity, AlertTriangle, BookMarked, Captions, Check, ChevronLeft, ChevronRight, CircleOff,
+  Activity, AlertTriangle, BookMarked, Captions, Check, CheckSquare, ChevronLeft, ChevronRight, CircleOff,
   ChevronDown, ChevronUp, ClipboardList, Database, Download, ExternalLink,
   Eye, Gauge, History, LayoutDashboard, LoaderCircle, LogOut, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, RotateCcw,
-  Layers, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, ToggleLeft, ToggleRight, UserCheck,
+  Layers, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Square, Trash2, ToggleLeft, ToggleRight, UserCheck,
   Users, UserX, Video, X, Zap,
 } from "lucide-react";
 import { ApiError, apiFetch } from "@/lib/api";
@@ -264,9 +264,13 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
     if (origin) params.set("origin", origin);
     if (sort !== "score") params.set("sort", sort);
     if (search.trim()) params.set("search", search.trim());
-    const data = await apiFetch<{ items: FeedVideo[]; total: number }>(`/api/admin/feed/videos?${params}`);
-    setVideos(data.items);
-    setTotal(data.total);
+    const [videoData, categoryData] = await Promise.all([
+      apiFetch<{ items: FeedVideo[]; total: number }>(`/api/admin/feed/videos?${params}`),
+      apiFetch<{ items: FeedCategory[] }>("/api/admin/feed/categories"),
+    ]);
+    setVideos(videoData.items);
+    setTotal(videoData.total);
+    setCategories(categoryData.items);
   }, [page, search, status, origin, sort]);
 
   const loadExpressions = useCallback(async () => {
@@ -347,6 +351,11 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
     setError("");
     activeLoader().catch(handleError).finally(() => setLoading(false));
   }, [activeLoader, handleError]);
+
+  // 카테고리는 소스, 영상 상세, 직접 가져오기 등 여러 곳에서 공유하므로 마운트 시에도 확보해 둔다.
+  useEffect(() => {
+    loadCategories().catch(handleError);
+  }, [loadCategories, handleError]);
 
   async function collect() {
     setCollecting(true);
@@ -769,7 +778,7 @@ function SourceEditModal({ source, categories, onClose, onSaved, onError }: { so
 }
 
 function VideoImportModal({
-  categories,
+  categories: initialCategories,
   onClose,
   onSaved,
   onError,
@@ -779,9 +788,20 @@ function VideoImportModal({
   onSaved: (notice: string) => Promise<void>;
   onError: (error: unknown) => void;
 }) {
+  const [categories, setCategories] = useState<FeedCategory[]>(initialCategories);
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState<VideoStatus>("APPROVED");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!initialCategories || initialCategories.length === 0) {
+      apiFetch<{ items: FeedCategory[] }>("/api/admin/feed/categories")
+        .then((res) => setCategories(res.items))
+        .catch(onError);
+    } else {
+      setCategories(initialCategories);
+    }
+  }, [initialCategories, onError]);
 
   const videoId = extractVideoId(url.trim());
   const isValid = Boolean(videoId);
@@ -872,6 +892,29 @@ function VideosPanel(props: { videos: FeedVideo[]; categories: FeedCategory[]; o
   const [busy, setBusy] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [detailId, setDetailId] = useState("");
+
+  const currentPageIds = useMemo(() => videos.map((v) => v.id), [videos]);
+  const isAllSelected = useMemo(
+    () => currentPageIds.length > 0 && currentPageIds.every((id) => selected.includes(id)),
+    [currentPageIds, selected]
+  );
+
+  const toggleSelectAll = useCallback(() => {
+    if (isAllSelected) {
+      setSelected((prev) => prev.filter((id) => !currentPageIds.includes(id)));
+    } else {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        currentPageIds.forEach((id) => next.add(id));
+        return Array.from(next);
+      });
+    }
+  }, [isAllSelected, currentPageIds]);
+
+  useEffect(() => {
+    setSelected([]);
+  }, [page, status, origin, sort, search]);
+
   async function decide(video: FeedVideo, next: VideoStatus) {
     setBusy(video.id);
     try { await apiFetch(`/api/admin/feed/videos/${video.id}`, { method: "PATCH", body: JSON.stringify({ status: next }) }); await reload(); } catch (error) { onError(error); } finally { setBusy(""); }
@@ -893,7 +936,7 @@ function VideosPanel(props: { videos: FeedVideo[]; categories: FeedCategory[]; o
     try { await apiFetch("/api/admin/feed/videos/batch-status", { method: "POST", body: JSON.stringify({ video_ids: selected, status: next }) }); setSelected([]); await reload(); onNotice(`선택 영상을 ${next} 상태로 변경했습니다.`); } catch (error) { onError(error); } finally { setBusy(""); }
   }
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  return <section className="panel-stack"><div className="filters"><SearchForm value={search} onSearch={setSearch} placeholder="제목 또는 채널 검색" /><select value={status} onChange={(event) => setStatus(event.target.value as VideoStatus | "")}><option value="">모든 상태</option><option value="CANDIDATE">검수 대기</option><option value="APPROVED">승인</option><option value="REJECTED">거절</option><option value="HIDDEN">숨김</option></select><select value={origin} onChange={(event) => setOrigin(event.target.value as VideoOrigin)}><option value="">모든 출처</option><option value="ADMIN">수집기</option><option value="USER">사용자 가져오기</option></select><select value={sort} onChange={(event) => setSort(event.target.value as VideoSort)} aria-label="정렬">{VIDEO_SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><span className="result-count">{total.toLocaleString()}개</span></div>{selected.length > 0 && <div className="batch-bar"><strong>{selected.length}개 선택</strong><button disabled={busy === "batch"} onClick={() => batch("APPROVED")}>승인</button><button disabled={busy === "batch"} onClick={() => batch("HIDDEN")}>숨김</button><button disabled={busy === "batch"} onClick={() => batch("DELETE")} className="danger-text">삭제</button></div>}{videos.length ? <div className="video-grid">{videos.map((video) => <article className="video-card" key={video.id}><label className="video-check"><input type="checkbox" checked={selected.includes(video.id)} onChange={(event) => setSelected((items) => event.target.checked ? [...items, video.id] : items.filter((id) => id !== video.id))} /></label><button className="thumbnail button-reset" onClick={() => setDetailId(video.id)}><img src={video.thumbnail_url} alt="" /><span>{durationLabel(video.duration_seconds)}</span></button><div className="video-body"><div className="video-badges"><span className={statusClass(video.status)}>{video.status}</span><span className="score">{video.base_score}점</span>{video.caption_available && <span className="caption-badge">CC</span>}{video.created_by_user_id && <span className="origin-badge" title={video.created_by || "사용자가 가져온 영상"}>사용자</span>}{video.created_by_user_id && video.visibility === "PUBLIC" && <span className="origin-badge public">공개됨</span>}</div><h3>{video.title}</h3><p>{video.channel_title}</p><small>{dateLabel(video.published_at)}</small><div className="video-actions"><button className="icon-button" onClick={() => setDetailId(video.id)} aria-label="미리보기"><Eye size={17} /></button><a className="icon-button" href={video.youtube_url} target="_blank" rel="noreferrer" aria-label="YouTube에서 열기"><ExternalLink size={17} /></a><button className="reject-button" onClick={() => decide(video, "REJECTED")} disabled={busy === video.id}><X size={17} /> 제외</button><button className="approve-button" onClick={() => decide(video, "APPROVED")} disabled={busy === video.id}><Check size={17} /> 승인</button><button className="icon-danger" onClick={() => remove(video)} disabled={busy === video.id}><Trash2 size={17} /></button></div></div></article>)}</div> : <EmptyState title="조건에 맞는 영상이 없습니다" description="필터를 바꾸거나 새 후보를 수집해 보세요." />}<Pagination page={page} pages={pages} setPage={setPage} />{detailId && <VideoDetailModal videoId={detailId} categories={categories} onClose={() => setDetailId("")} onError={onError} onNotice={onNotice} />}</section>;
+  return <section className="panel-stack"><div className="filters"><SearchForm value={search} onSearch={setSearch} placeholder="제목 또는 채널 검색" /><select value={status} onChange={(event) => setStatus(event.target.value as VideoStatus | "")}><option value="">모든 상태</option><option value="CANDIDATE">검수 대기</option><option value="APPROVED">승인</option><option value="REJECTED">거절</option><option value="HIDDEN">숨김</option></select><select value={origin} onChange={(event) => setOrigin(event.target.value as VideoOrigin)}><option value="">모든 출처</option><option value="ADMIN">수집기</option><option value="USER">사용자 가져오기</option></select><select value={sort} onChange={(event) => setSort(event.target.value as VideoSort)} aria-label="정렬">{VIDEO_SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><button type="button" className={`select-all-button${isAllSelected ? " selected" : ""}`} onClick={toggleSelectAll} disabled={!videos.length} title={isAllSelected ? "현재 페이지 전체 선택 해제" : "현재 페이지 모든 영상 선택"}>{isAllSelected ? <CheckSquare size={16} /> : <Square size={16} />}<span>{isAllSelected ? "선택 해제" : "전체 선택"}</span></button><span className="result-count">{total.toLocaleString()}개</span></div>{selected.length > 0 && <div className="batch-bar"><button type="button" className="select-toggle-btn button-reset" onClick={toggleSelectAll} title={isAllSelected ? "현재 페이지 전체 선택 해제" : "현재 페이지 모든 영상 선택"}>{isAllSelected ? <CheckSquare size={15} /> : <Square size={15} />}<span>{isAllSelected ? "선택 해제" : "전체 선택"}</span></button><strong>{selected.length}개 선택</strong><button disabled={busy === "batch"} onClick={() => batch("APPROVED")}>승인</button><button disabled={busy === "batch"} onClick={() => batch("HIDDEN")}>숨김</button><button disabled={busy === "batch"} onClick={() => batch("DELETE")} className="danger-text">삭제</button></div>}{videos.length ? <div className="video-grid">{videos.map((video) => <article className="video-card" key={video.id}><label className="video-check"><input type="checkbox" checked={selected.includes(video.id)} onChange={(event) => setSelected((items) => event.target.checked ? [...items, video.id] : items.filter((id) => id !== video.id))} /></label><button className="thumbnail button-reset" onClick={() => setDetailId(video.id)}><img src={video.thumbnail_url} alt="" /><span>{durationLabel(video.duration_seconds)}</span></button><div className="video-body"><div className="video-badges"><span className={statusClass(video.status)}>{video.status}</span><span className="score">{video.base_score}점</span>{video.caption_available && <span className="caption-badge">CC</span>}{video.created_by_user_id && <span className="origin-badge" title={video.created_by || "사용자가 가져온 영상"}>사용자</span>}{video.created_by_user_id && video.visibility === "PUBLIC" && <span className="origin-badge public">공개됨</span>}</div><h3>{video.title}</h3><p>{video.channel_title}</p><small>{dateLabel(video.published_at)}</small><div className="video-actions"><button className="icon-button" onClick={() => setDetailId(video.id)} aria-label="미리보기"><Eye size={17} /></button><a className="icon-button" href={video.youtube_url} target="_blank" rel="noreferrer" aria-label="YouTube에서 열기"><ExternalLink size={17} /></a><button className="reject-button" onClick={() => decide(video, "REJECTED")} disabled={busy === video.id}><X size={17} /> 제외</button><button className="approve-button" onClick={() => decide(video, "APPROVED")} disabled={busy === video.id}><Check size={17} /> 승인</button><button className="icon-danger" onClick={() => remove(video)} disabled={busy === video.id}><Trash2 size={17} /></button></div></div></article>)}</div> : <EmptyState title="조건에 맞는 영상이 없습니다" description="필터를 바꾸거나 새 후보를 수집해 보세요." />}<Pagination page={page} pages={pages} setPage={setPage} />{detailId && <VideoDetailModal videoId={detailId} categories={categories} onClose={() => setDetailId("")} onError={onError} onNotice={onNotice} />}</section>;
 }
 
 function VideoDetailModal({ videoId, categories, onClose, onError, onNotice }: { videoId: string; categories: FeedCategory[]; onClose: () => void; onError: (error: unknown) => void; onNotice: (message: string) => void }) {
@@ -1896,14 +1939,25 @@ function CategoryPicker({ name, categories, selected }: {
   );
 }
 
-function VideoCategoryEditor({ videoId, categories, onError, onNotice }: {
+function VideoCategoryEditor({ videoId, categories: initialCategories, onError, onNotice }: {
   videoId: string;
   categories: FeedCategory[];
   onError: (error: unknown) => void;
   onNotice: (message: string) => void;
 }) {
+  const [categories, setCategories] = useState<FeedCategory[]>(initialCategories);
   const [assignments, setAssignments] = useState<VideoCategoryAssignment[] | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!initialCategories || initialCategories.length === 0) {
+      apiFetch<{ items: FeedCategory[] }>("/api/admin/feed/categories")
+        .then((res) => setCategories(res.items))
+        .catch(onError);
+    } else {
+      setCategories(initialCategories);
+    }
+  }, [initialCategories, onError]);
 
   const load = useCallback(async () => {
     try {
