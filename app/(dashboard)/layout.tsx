@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { usePathname } from "next/navigation";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { DEFAULT_TAB, isTab } from "@/lib/tabs";
@@ -17,6 +18,12 @@ import { DEFAULT_TAB, isTab } from "@/lib/tabs";
  */
 export default function DashboardLayout() {
   const pathname = usePathname();
-  const slug = pathname === "/" ? DEFAULT_TAB : pathname.replace(/^\/+/, "");
-  return <AdminDashboard tab={isTab(slug) ? slug : DEFAULT_TAB} />;
+  const segments = pathname.split("/").filter(Boolean);
+  const first = segments[0] || DEFAULT_TAB;
+  const tab = isTab(first) ? first : DEFAULT_TAB;
+  return (
+    <Suspense fallback={<div className="loading-state" />}>
+      <AdminDashboard tab={tab} />
+    </Suspense>
+  );
 }

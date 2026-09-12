@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Activity, AlertTriangle, BookMarked, Captions, Check, ChevronLeft, ChevronRight, CircleOff,
   ChevronDown, ChevronUp, ClipboardList, Database, Download, ExternalLink,
@@ -11,7 +11,7 @@ import {
   Users, UserX, Video, X, Zap,
 } from "lucide-react";
 import { ApiError, apiFetch } from "@/lib/api";
-import { TAB_LABELS, tabHref, type Tab } from "@/lib/tabs";
+import { DEFAULT_TAB, isTab, TAB_LABELS, tabHref, type Tab } from "@/lib/tabs";
 import type {
   AdminMember, AdminRole, AdminUser, CoachingHistory, CollectionRun, Expression,
   RecommendationQuality,
@@ -89,6 +89,23 @@ function validateSourceInput(sourceType: SourceType, value: string) {
 
 export function AdminDashboard({ tab }: { tab: Tab }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const urlPage = useMemo(() => {
+    const raw = searchParams.get("page") || searchParams.get("pageNum");
+    if (raw) {
+      const parsed = parseInt(raw, 10);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+    }
+    const pathMatch = pathname.match(/\/page\/(\d+)/);
+    if (pathMatch) {
+      const parsed = parseInt(pathMatch[1], 10);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+    }
+    return 1;
+  }, [pathname, searchParams]);
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [importingVideo, setImportingVideo] = useState(false);
   const [overview, setOverview] = useState<Overview | null>(null);
@@ -102,34 +119,34 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
   const [jobs, setJobs] = useState<YouTubeJob[]>([]);
   const [workers, setWorkers] = useState<WorkerHeartbeat[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(tab === "videos" ? urlPage : 1);
   const [status, setStatus] = useState<VideoStatus | "">("CANDIDATE");
   // 사용자가 가져온 영상은 검수 대상이 아니다. 기본은 수집기 것만 본다.
   const [origin, setOrigin] = useState<VideoOrigin>("ADMIN");
   const [sort, setSort] = useState<VideoSort>("score");
   const [search, setSearch] = useState("");
   const [userTotal, setUserTotal] = useState(0);
-  const [userPage, setUserPage] = useState(1);
+  const [userPage, setUserPage] = useState(tab === "users" ? urlPage : 1);
   const [userStatus, setUserStatus] = useState<UserApprovalStatus | "">("PENDING");
   const [userSearch, setUserSearch] = useState("");
   const [expressionTotal, setExpressionTotal] = useState(0);
-  const [expressionPage, setExpressionPage] = useState(1);
+  const [expressionPage, setExpressionPage] = useState(tab === "expressions" ? urlPage : 1);
   const [expressionSearch, setExpressionSearch] = useState("");
   const [expressionLevel, setExpressionLevel] = useState("");
   const [jobTotal, setJobTotal] = useState(0);
-  const [jobPage, setJobPage] = useState(1);
+  const [jobPage, setJobPage] = useState(tab === "jobs" ? urlPage : 1);
   const [jobStatus, setJobStatus] = useState<JobStatus | "">("");
   const [transcriptStats, setTranscriptStats] = useState<TranscriptStats | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptRow[]>([]);
   const [transcriptTotal, setTranscriptTotal] = useState(0);
-  const [transcriptPage, setTranscriptPage] = useState(1);
+  const [transcriptPage, setTranscriptPage] = useState(tab === "transcripts" ? urlPage : 1);
   const [transcriptSearch, setTranscriptSearch] = useState("");
   const [transcriptSource, setTranscriptSource] = useState("");
   const [transcriptStale, setTranscriptStale] = useState(false);
   const [reportHealth, setReportHealth] = useState<ReportHealth | null>(null);
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [reportTotal, setReportTotal] = useState(0);
-  const [reportPage, setReportPage] = useState(1);
+  const [reportPage, setReportPage] = useState(tab === "reports" ? urlPage : 1);
   const [reportSearch, setReportSearch] = useState("");
   const [reportConfidence, setReportConfidence] = useState("");
   const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSetting[]>([]);
@@ -139,6 +156,65 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
   const [collecting, setCollecting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  const syncPageToUrl = useCallback((nextPage: number, replace = false) => {
+    const key = searchParams.has("pageNum") ? "pageNum" : "page";
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (nextPage <= 1) {
+      nextParams.delete("page");
+      nextParams.delete("pageNum");
+    } else {
+      nextParams.set(key, String(nextPage));
+    }
+    const qs = nextParams.toString();
+    const nextUrl = qs ? `${pathname}?${qs}` : pathname;
+    if (replace) {
+      router.replace(nextUrl, { scroll: false });
+    } else {
+      router.push(nextUrl, { scroll: false });
+    }
+  }, [pathname, router, searchParams]);
+
+  const handlePageChange = useCallback((nextPage: number) => {
+    if (tab === "videos") setPage(nextPage);
+    else if (tab === "users") setUserPage(nextPage);
+    else if (tab === "expressions") setExpressionPage(nextPage);
+    else if (tab === "jobs") setJobPage(nextPage);
+    else if (tab === "transcripts") setTranscriptPage(nextPage);
+    else if (tab === "reports") setReportPage(nextPage);
+    syncPageToUrl(nextPage, false);
+  }, [tab, syncPageToUrl]);
+
+  const handlePageReset = useCallback(() => {
+    if (tab === "videos") setPage(1);
+    else if (tab === "users") setUserPage(1);
+    else if (tab === "expressions") setExpressionPage(1);
+    else if (tab === "jobs") setJobPage(1);
+    else if (tab === "transcripts") setTranscriptPage(1);
+    else if (tab === "reports") setReportPage(1);
+    syncPageToUrl(1, true);
+  }, [tab, syncPageToUrl]);
+
+  useEffect(() => {
+    if (tab === "videos") setPage(urlPage);
+    else if (tab === "users") setUserPage(urlPage);
+    else if (tab === "expressions") setExpressionPage(urlPage);
+    else if (tab === "jobs") setJobPage(urlPage);
+    else if (tab === "transcripts") setTranscriptPage(urlPage);
+    else if (tab === "reports") setReportPage(urlPage);
+  }, [tab, urlPage]);
+
+  // /videos/page/2 또는 /page/2 같은 경로형 접근 시 정식 쿼리 형태(?page=2)로 정규화
+  useEffect(() => {
+    const pathMatch = pathname.match(/^\/(?:([^\/]+)\/)?page\/(\d+)/);
+    if (pathMatch) {
+      const tabSegment = pathMatch[1];
+      const pageNum = pathMatch[2];
+      const targetTab = tabSegment && isTab(tabSegment) ? tabSegment : (tab === DEFAULT_TAB ? "" : tab);
+      const targetPath = targetTab ? `/${targetTab}` : "/";
+      router.replace(`${targetPath}?page=${pageNum}`, { scroll: false });
+    }
+  }, [pathname, tab, router]);
 
   const toggleSidebar = useCallback(() => setSidebarCollapsed((previous) => !previous), []);
   const expandSidebar = useCallback(() => setSidebarCollapsed(false), []);
@@ -368,14 +444,14 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
         {loading ? <div className="loading-state"><LoaderCircle className="spin" /><p>데이터를 불러오는 중입니다.</p></div> : (
           <>
             {tab === "overview" && overview && <OverviewPanel data={overview} onNavigate={navigate} />}
-            {tab === "users" && <UsersPanel users={users} members={members} status={userStatus} setStatus={(next) => { setUserPage(1); setUserStatus(next); }} search={userSearch} setSearch={(next) => { setUserPage(1); setUserSearch(next); }} reload={loadUsers} onError={handleError} total={userTotal} page={userPage} setPage={setUserPage} />}
+            {tab === "users" && <UsersPanel users={users} members={members} status={userStatus} setStatus={(next) => { handlePageReset(); setUserStatus(next); }} search={userSearch} setSearch={(next) => { handlePageReset(); setUserSearch(next); }} reload={loadUsers} onError={handleError} total={userTotal} page={userPage} setPage={handlePageChange} />}
             {tab === "categories" && <CategoriesPanel categories={categories} reload={loadCategories} onError={handleError} onNotice={setNotice} />}
             {tab === "sources" && <SourcesPanel sources={sources} categories={categories} reload={loadSources} onError={handleError} onNotice={setNotice} />}
-            {tab === "videos" && <VideosPanel videos={videos} categories={categories} origin={origin} setOrigin={(next) => { setPage(1); setOrigin(next); }} status={status} setStatus={(next) => { setPage(1); setStatus(next); }} sort={sort} setSort={(next) => { setPage(1); setSort(next); }} search={search} setSearch={(next) => { setPage(1); setSearch(next); }} reload={loadVideos} onError={handleError} total={total} page={page} setPage={setPage} onNotice={setNotice} />}
-            {tab === "expressions" && <ExpressionsPanel expressions={expressions} total={expressionTotal} page={expressionPage} setPage={setExpressionPage} search={expressionSearch} setSearch={(next) => { setExpressionPage(1); setExpressionSearch(next); }} level={expressionLevel} setLevel={(next) => { setExpressionPage(1); setExpressionLevel(next); }} reload={loadExpressions} onError={handleError} />}
-            {tab === "jobs" && <JobsPanel jobs={jobs} workers={workers} total={jobTotal} page={jobPage} setPage={setJobPage} status={jobStatus} setStatus={(next) => { setJobPage(1); setJobStatus(next); }} reload={loadJobs} onError={handleError} />}
-            {tab === "transcripts" && <TranscriptsPanel stats={transcriptStats} rows={transcripts} total={transcriptTotal} page={transcriptPage} setPage={setTranscriptPage} search={transcriptSearch} setSearch={(next) => { setTranscriptPage(1); setTranscriptSearch(next); }} source={transcriptSource} setSource={(next) => { setTranscriptPage(1); setTranscriptSource(next); }} onlyStale={transcriptStale} setOnlyStale={(next) => { setTranscriptPage(1); setTranscriptStale(next); }} reload={loadTranscripts} onError={handleError} onNotice={setNotice} />}
-            {tab === "reports" && <ReportsPanel health={reportHealth} rows={reports} total={reportTotal} page={reportPage} setPage={setReportPage} search={reportSearch} setSearch={(next) => { setReportPage(1); setReportSearch(next); }} confidence={reportConfidence} setConfidence={(next) => { setReportPage(1); setReportConfidence(next); }} reload={loadReports} />}
+            {tab === "videos" && <VideosPanel videos={videos} categories={categories} origin={origin} setOrigin={(next) => { handlePageReset(); setOrigin(next); }} status={status} setStatus={(next) => { handlePageReset(); setStatus(next); }} sort={sort} setSort={(next) => { handlePageReset(); setSort(next); }} search={search} setSearch={(next) => { handlePageReset(); setSearch(next); }} reload={loadVideos} onError={handleError} total={total} page={page} setPage={handlePageChange} onNotice={setNotice} />}
+            {tab === "expressions" && <ExpressionsPanel expressions={expressions} total={expressionTotal} page={expressionPage} setPage={handlePageChange} search={expressionSearch} setSearch={(next) => { handlePageReset(); setExpressionSearch(next); }} level={expressionLevel} setLevel={(next) => { handlePageReset(); setExpressionLevel(next); }} reload={loadExpressions} onError={handleError} />}
+            {tab === "jobs" && <JobsPanel jobs={jobs} workers={workers} total={jobTotal} page={jobPage} setPage={handlePageChange} status={jobStatus} setStatus={(next) => { handlePageReset(); setJobStatus(next); }} reload={loadJobs} onError={handleError} />}
+            {tab === "transcripts" && <TranscriptsPanel stats={transcriptStats} rows={transcripts} total={transcriptTotal} page={transcriptPage} setPage={handlePageChange} search={transcriptSearch} setSearch={(next) => { handlePageReset(); setTranscriptSearch(next); }} source={transcriptSource} setSource={(next) => { handlePageReset(); setTranscriptSource(next); }} onlyStale={transcriptStale} setOnlyStale={(next) => { handlePageReset(); setTranscriptStale(next); }} reload={loadTranscripts} onError={handleError} onNotice={setNotice} />}
+            {tab === "reports" && <ReportsPanel health={reportHealth} rows={reports} total={reportTotal} page={reportPage} setPage={handlePageChange} search={reportSearch} setSearch={(next) => { handlePageReset(); setReportSearch(next); }} confidence={reportConfidence} setConfidence={(next) => { handlePageReset(); setReportConfidence(next); }} reload={loadReports} />}
             {tab === "quality" && <QualityPanel data={quality} days={qualityDays} setDays={setQualityDays} reload={loadQuality} />}
             {tab === "runs" && <RunsPanel runs={runs} />}
             {tab === "settings" && <SettingsPanel items={runtimeSettings} reload={loadSettings} onError={handleError} onNotice={setNotice} />}
