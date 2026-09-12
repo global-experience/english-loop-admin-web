@@ -1,7 +1,9 @@
 export type SourceType = "KEYWORD" | "CHANNEL" | "VIDEO";
 export type VideoStatus = "CANDIDATE" | "APPROVED" | "REJECTED" | "HIDDEN";
-/** 어드민 목록의 출처 필터. 사용자 가져오기는 검수 대상이 아니다. */
+/** 어드민 목록의 출처 필터. 기본 검수 큐와 사용자 가져오기를 구분한다. */
 export type VideoOrigin = "" | "ADMIN" | "USER";
+/** 사용자 가져오기 영상의 공개 범위 필터. 빈 값은 공개·비공개 전체다. */
+export type VideoVisibility = "" | "PUBLIC" | "PRIVATE";
 /** 어드민 영상 목록 정렬. 백엔드 `FeedVideoSort` 와 값이 같아야 한다. */
 export type VideoSort =
   | "score"
