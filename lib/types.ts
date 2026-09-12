@@ -137,6 +137,7 @@ export interface FeedVideo {
   /** 누가 볼 수 있나. 귀속과 별개다 — 승격해도 작성자는 유지된다. */
   visibility: "PUBLIC" | "PRIVATE";
   raw_metadata?: Record<string, unknown>;
+  categories?: { id: string; label: string }[];
   transcript?: {
     exists: boolean;
     pipeline_version: number | null;
