@@ -2,6 +2,30 @@ export type SourceType = "KEYWORD" | "CHANNEL" | "VIDEO";
 export type VideoStatus = "CANDIDATE" | "APPROVED" | "REJECTED" | "HIDDEN";
 /** 어드민 목록의 출처 필터. 사용자 가져오기는 검수 대상이 아니다. */
 export type VideoOrigin = "" | "ADMIN" | "USER";
+/** 어드민 영상 목록 정렬. 백엔드 `FeedVideoSort` 와 값이 같아야 한다. */
+export type VideoSort =
+  | "score"
+  | "collected_desc"
+  | "collected_asc"
+  | "published_desc"
+  | "published_asc"
+  | "updated_desc"
+  | "duration_asc"
+  | "duration_desc"
+  | "title"
+  | "channel";
+export const VIDEO_SORT_OPTIONS: { value: VideoSort; label: string }[] = [
+  { value: "score", label: "추천 점수순" },
+  { value: "collected_desc", label: "최근 수집" },
+  { value: "collected_asc", label: "오래된 수집" },
+  { value: "published_desc", label: "게시일 최신" },
+  { value: "published_asc", label: "게시일 과거" },
+  { value: "updated_desc", label: "최근 변경" },
+  { value: "duration_asc", label: "짧은 영상" },
+  { value: "duration_desc", label: "긴 영상" },
+  { value: "title", label: "제목 A→Z" },
+  { value: "channel", label: "채널명" },
+];
 export type UserApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type AdminRole = "OWNER" | "ADMIN";
 export type JobStatus = "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
@@ -216,7 +240,7 @@ export interface WorkerHeartbeat {
 
 export interface CollectionRun {
   id: string;
-  status: "RUNNING" | "COMPLETED" | "FAILED";
+  status: "RUNNING" | "COMPLETED" | "FAILED" | "SKIPPED";
   requested_count: number;
   discovered_count: number;
   inserted_count: number;

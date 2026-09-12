@@ -440,15 +440,24 @@ button {
 
 .source-form {
     margin: -6px 0 22px;
-    padding: 18px;
+    padding: 18px 20px;
     background: #f5f7f2;
+    border: 1px solid var(--line);
     border-radius: 14px;
     display: flex;
-    align-items: start;
-    gap: 10px;
+    flex-direction: column;
+    gap: 14px;
 }
 
-.source-form label,
+.source-form-fields {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    width: 100%;
+}
+
+.source-form-fields label,
+.source-form > label:not(.category-chip):not(.source-form-categories),
 .login-card label {
     display: grid;
     gap: 6px;
@@ -457,12 +466,21 @@ button {
     font-weight: 600;
 }
 
+.source-form-fields .grow,
 .source-form .grow {
     flex: 1;
+    min-width: 200px;
 }
 
-.source-form input,
-.source-form select,
+.source-priority-label {
+    width: 80px;
+    flex-shrink: 0;
+}
+
+.source-form-fields input,
+.source-form-fields select,
+.source-form > input:not([type="checkbox"]),
+.source-form > select,
 .filters input,
 .filters select,
 .login-card input {
@@ -473,14 +491,22 @@ button {
     padding: 0 11px;
     color: var(--ink);
     outline: none;
+    box-sizing: border-box;
 }
 
-.source-form input:focus,
-.source-form select:focus,
+.source-form-fields input:focus,
+.source-form-fields select:focus,
+.source-form > input:focus,
+.source-form > select:focus,
 .filters input:focus,
 .login-card input:focus {
     border-color: #77a48e;
     box-shadow: 0 0 0 3px rgba(29, 92, 67, .1);
+}
+
+.source-form-fields .primary-button {
+    height: 42px;
+    flex-shrink: 0;
 }
 
 .source-list {
@@ -864,6 +890,12 @@ button {
     background: #f3e1de;
 }
 
+/* 쿼터 한도로 건너뛴 실행. 실패(빨강)와 구분되어야 원인을 오해하지 않는다. */
+.run-skipped {
+    color: var(--amber);
+    background: #f5ebcf;
+}
+
 .run-row strong,
 .run-row span,
 .run-row small {
@@ -1138,12 +1170,12 @@ button {
         grid-template-columns: repeat(2, 1fr);
     }
 
-    .source-form {
+    .source-form-fields {
         display: grid;
         grid-template-columns: 1fr 1fr;
     }
 
-    .source-form .grow {
+    .source-form-fields .grow {
         grid-column: 1/-1;
     }
 }
@@ -1231,12 +1263,12 @@ button {
         flex-direction: column;
     }
 
-    .source-form,
+    .source-form-fields,
     .admin-member-form {
         grid-template-columns: 1fr;
     }
 
-    .source-form .grow {
+    .source-form-fields .grow {
         grid-column: auto;
     }
 
@@ -1562,7 +1594,7 @@ body:has(.modal-backdrop) {
     gap: 13px;
 }
 
-.drawer-form label {
+.drawer-form label:not(.category-chip):not(.check-label) {
     display: grid;
     gap: 6px;
     color: var(--muted);
@@ -1570,7 +1602,7 @@ body:has(.modal-backdrop) {
     font-weight: 700;
 }
 
-.drawer-form input,
+.drawer-form input:not([type="checkbox"]),
 .drawer-form select,
 .drawer-form textarea {
     min-height: 42px;
@@ -2325,41 +2357,122 @@ body:has(.modal-backdrop) {
     font-size: 11.5px;
 }
 
+.source-form-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+    width: 100%;
+}
+
+.source-form-categories-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.source-form-categories-title {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .01em;
+}
+
+.source-form-categories small {
+    color: var(--muted);
+    font-size: 11.5px;
+}
+
+.drawer-form .source-form-categories {
+    padding-top: 4px;
+    border-top: none;
+}
+
 .category-picker {
     display: flex;
     flex-wrap: wrap;
-    gap: 7px;
-    margin-top: 6px;
-}
-
-.category-chip {
-    display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 7px 12px;
-    border: 1px solid var(--line);
-    border-radius: 99px;
-    background: #fff;
-    color: var(--ink);
-    font-size: 12.5px;
-    cursor: pointer;
-    transition: .15s ease;
+    gap: 6px 8px;
+    margin-top: 2px;
 }
 
-.category-chip:hover {
-    border-color: color-mix(in srgb, var(--green) 40%, var(--line));
+.category-chip,
+.source-form .category-chip,
+.drawer-form .category-chip {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 12px !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 99px !important;
+    background: #fff !important;
+    color: var(--ink) !important;
+    font-size: 12.5px !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease !important;
+    box-sizing: border-box !important;
+    white-space: nowrap !important;
+    margin: 0 !important;
 }
 
-/* 선택 상태가 체크박스 하나로만 보이면 칩이 많을 때 읽히지 않는다. */
-.category-chip:has(input:checked) {
-    color: var(--green);
-    background: color-mix(in srgb, var(--green) 8%, #fff);
-    border-color: color-mix(in srgb, var(--green) 45%, var(--line));
-    font-weight: 600;
+.category-chip:hover,
+.source-form .category-chip:hover,
+.drawer-form .category-chip:hover {
+    border-color: color-mix(in srgb, var(--green) 40%, var(--line)) !important;
+    background: #fbfcf9 !important;
 }
 
-.source-form-categories {
-    grid-column: 1 / -1;
+/* 체크박스 크기 및 스타일 강제 리셋 — 폼의 height: 42px 등이 상속되어 거대해지는 것 방지 */
+.category-chip input[type="checkbox"],
+.source-form .category-chip input[type="checkbox"],
+.drawer-form .category-chip input[type="checkbox"] {
+    -webkit-appearance: checkbox !important;
+    appearance: auto !important;
+    width: 14px !important;
+    height: 14px !important;
+    min-height: 14px !important;
+    max-height: 14px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 3px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    accent-color: var(--green) !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+    vertical-align: middle !important;
+}
+
+.category-chip span,
+.source-form .category-chip span,
+.drawer-form .category-chip span {
+    color: inherit !important;
+    font-size: 12.5px !important;
+    font-weight: inherit !important;
+    line-height: 1 !important;
+}
+
+/* 선택 상태: 은은한 초록 배경과 강조 테두리 */
+.category-chip:has(input:checked),
+.source-form .category-chip:has(input:checked),
+.drawer-form .category-chip:has(input:checked) {
+    color: var(--green) !important;
+    background: color-mix(in srgb, var(--green) 9%, #fff) !important;
+    border-color: color-mix(in srgb, var(--green) 48%, var(--line)) !important;
+    font-weight: 600 !important;
+}
+
+.category-chip:focus-within {
+    outline: 2px solid color-mix(in srgb, var(--green) 35%, transparent) !important;
+    outline-offset: 1px !important;
 }
 
 /* ── 피드 영상 출처 ── */
