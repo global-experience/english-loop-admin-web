@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Activity, AlertTriangle, BookMarked, Captions, Check, ChevronLeft, ChevronRight, CircleOff,
-  ChevronDown, ChevronUp, ClipboardList, Database, ExternalLink,
+  ChevronDown, ChevronUp, ClipboardList, Database, Download, ExternalLink,
   Eye, Gauge, History, LayoutDashboard, LoaderCircle, LogOut, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, RotateCcw,
   Layers, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Trash2, ToggleLeft, ToggleRight, UserCheck,
   Users, UserX, Video, X, Zap,
@@ -77,23 +77,20 @@ function extractChannelHandle(value: string) {
 function validateSourceInput(sourceType: SourceType, value: string) {
   const trimmed = value.trim();
   if (!trimmed) return { status: "ERROR" as const, message: "검색 값을 입력하세요." };
-  if (sourceType === "VIDEO") {
-    return extractVideoId(trimmed)
-      ? { status: "OK" as const, message: "YouTube 영상으로 인식됐습니다." }
-      : { status: "ERROR" as const, message: "YouTube 영상 URL 또는 11자리 영상 ID를 입력하세요." };
-  }
   if (sourceType === "CHANNEL") {
     if (extractChannelId(trimmed)) return { status: "OK" as const, message: "YouTube 채널 ID로 인식됐습니다." };
     if (extractChannelHandle(trimmed)) return { status: "OK" as const, message: "YouTube 핸들로 인식됐습니다. 저장 시 채널 ID로 확인합니다." };
-    if (extractVideoId(trimmed)) return { status: "ERROR" as const, message: "영상 URL은 직접 영상 유형으로 추가하세요." };
+    if (extractVideoId(trimmed)) return { status: "ERROR" as const, message: "개별 영상은 우측 상단의 '영상 직접 가져오기'를 이용하세요." };
     return { status: "WARNING" as const, message: "채널 ID가 아니므로 일반 검색어로 수집됩니다." };
   }
+  if (extractVideoId(trimmed)) return { status: "WARNING" as const, message: "영상 1건은 우측 상단 '영상 직접 가져오기'를 이용할 수 있습니다." };
   return { status: "OK" as const, message: "검색어로 수집됩니다." };
 }
 
 export function AdminDashboard({ tab }: { tab: Tab }) {
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [importingVideo, setImportingVideo] = useState(false);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [sources, setSources] = useState<FeedSource[]>([]);
   const [categories, setCategories] = useState<FeedCategory[]>([]);
@@ -345,10 +342,26 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
               <h1>{TAB_LABELS[tab]}</h1>
             </div>
           </div>
-          <button className="primary-button collect-button" onClick={collect} disabled={collecting}>
-            {collecting ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}
-            {collecting ? "수집 중…" : "후보 100개 수집"}
-          </button>
+          {tab === "sources" && (
+            <div className="topbar-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setImportingVideo(true)}
+              >
+                <Download size={17} /> 영상 직접 가져오기
+              </button>
+              <button
+                type="button"
+                className="primary-button collect-button"
+                onClick={collect}
+                disabled={collecting}
+              >
+                {collecting ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}
+                {collecting ? "수집 중…" : "후보 100개 수집"}
+              </button>
+            </div>
+          )}
         </header>
         {error && <div className="alert error"><CircleOff size={18} />{error}<button onClick={() => setError("")}><X size={16} /></button></div>}
         {notice && <div className="alert success"><Check size={18} />{notice}<button onClick={() => setNotice("")}><X size={16} /></button></div>}
@@ -367,6 +380,18 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
             {tab === "runs" && <RunsPanel runs={runs} />}
             {tab === "settings" && <SettingsPanel items={runtimeSettings} reload={loadSettings} onError={handleError} onNotice={setNotice} />}
           </>
+        )}
+        {importingVideo && (
+          <VideoImportModal
+            categories={categories}
+            onClose={() => setImportingVideo(false)}
+            onSaved={async (msg) => {
+              setNotice(msg);
+              await loadSources();
+              await loadVideos();
+            }}
+            onError={handleError}
+          />
         )}
       </main>
     </div>
@@ -566,7 +591,7 @@ function SourcesPanel({ sources, categories, reload, onError, onNotice }: { sour
     setBusy(source.id);
     try { await apiFetch(`/api/admin/feed/sources/${source.id}`, { method: "DELETE" }); await reload(); } catch (error) { onError(error); } finally { setBusy(""); }
   }
-  return <section className="panel-stack"><article className="panel"><div className="panel-heading"><div><p className="eyebrow">DISCOVERY INPUTS</p><h2>검색어·채널·직접 영상</h2></div><div className="button-row"><button className="secondary-button" onClick={seedDefaults} disabled={busy === "defaults"}><RefreshCw size={16} /> 기본 소스 채우기</button><button className="primary-button" onClick={() => { setEditing(null); setShowForm(!showForm); }}><Plus size={17} /> 소스 추가</button></div></div>{showForm && <SourceForm categories={categories} onSaved={async () => { setShowForm(false); await reload(); }} onError={onError} />}{sources.length ? <div className="source-list">{sources.map((source) => <article className={source.enabled ? "source-row" : "source-row disabled"} key={source.id}><span className={`type-badge type-${source.source_type.toLowerCase()}`}>{source.source_type}</span><div><strong>{source.label}</strong><span>{source.value}</span>{source.validation && <small className={`source-validation validation-${source.validation.status.toLowerCase()}`}>{source.validation.message}</small>}</div><span className="priority">우선순위 {source.priority}</span><div className="row-actions"><button className="icon-button" onClick={() => collectSource(source)} disabled={busy === `collect:${source.id}`} aria-label="이 소스만 수집"><Sparkles size={17} /></button><button className="icon-button" onClick={() => setEditing(source)} aria-label="수정"><Pencil size={17} /></button><button className="icon-button" onClick={() => toggle(source)} disabled={busy === source.id} aria-label={source.enabled ? "비활성화" : "활성화"}>{source.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}</button><button className="icon-danger" onClick={() => remove(source)} disabled={busy === source.id} aria-label="삭제"><Trash2 size={17} /></button></div></article>)}</div> : <EmptyState title="수집 소스가 없습니다" description="기본 소스를 채우거나 직접 검색어와 채널을 추가하세요." />}</article>{editing && <SourceEditModal source={editing} categories={categories} onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await reload(); }} onError={onError} />}</section>;
+  return <section className="panel-stack"><article className="panel"><div className="panel-heading"><div><p className="eyebrow">DISCOVERY INPUTS</p><h2>검색어·채널</h2></div><div className="button-row"><button className="secondary-button" onClick={seedDefaults} disabled={busy === "defaults"}><RefreshCw size={16} /> 기본 소스 채우기</button><button className="primary-button" onClick={() => { setEditing(null); setShowForm(!showForm); }}><Plus size={17} /> 소스 추가</button></div></div>{showForm && <SourceForm categories={categories} onSaved={async () => { setShowForm(false); await reload(); }} onError={onError} />}{sources.length ? <div className="source-list">{sources.map((source) => <article className={source.enabled ? "source-row" : "source-row disabled"} key={source.id}><span className={`type-badge type-${source.source_type.toLowerCase()}`}>{source.source_type}</span><div><strong>{source.label}</strong><span>{source.value}</span>{source.validation && <small className={`source-validation validation-${source.validation.status.toLowerCase()}`}>{source.validation.message}</small>}</div><span className="priority">우선순위 {source.priority}</span><div className="row-actions"><button className="icon-button" onClick={() => collectSource(source)} disabled={busy === `collect:${source.id}`} aria-label="이 소스만 수집"><Sparkles size={17} /></button><button className="icon-button" onClick={() => setEditing(source)} aria-label="수정"><Pencil size={17} /></button><button className="icon-button" onClick={() => toggle(source)} disabled={busy === source.id} aria-label={source.enabled ? "비활성화" : "활성화"}>{source.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}</button><button className="icon-danger" onClick={() => remove(source)} disabled={busy === source.id} aria-label="삭제"><Trash2 size={17} /></button></div></article>)}</div> : <EmptyState title="수집 소스가 없습니다" description="기본 소스를 채우거나 직접 검색어와 채널을 추가하세요." />}</article>{editing && <SourceEditModal source={editing} categories={categories} onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await reload(); }} onError={onError} />}</section>;
 }
 
 function SourceForm({ categories, onSaved, onError }: { categories: FeedCategory[]; onSaved: () => Promise<void>; onError: (error: unknown) => void }) {
@@ -597,7 +622,6 @@ function SourceForm({ categories, onSaved, onError }: { categories: FeedCategory
           <select value={sourceType} onChange={(event) => setSourceType(event.target.value as SourceType)}>
             <option value="KEYWORD">검색어</option>
             <option value="CHANNEL">채널·주제</option>
-            <option value="VIDEO">직접 영상</option>
           </select>
         </label>
         <label>
@@ -614,9 +638,7 @@ function SourceForm({ categories, onSaved, onError }: { categories: FeedCategory
             placeholder={
               sourceType === "KEYWORD"
                 ? "Natural English conversation"
-                : sourceType === "CHANNEL"
-                ? "@handle, 채널 URL, UC... 채널 ID 또는 주제어"
-                : "YouTube URL 또는 영상 ID"
+                : "@handle, 채널 URL, UC... 채널 ID 또는 주제어"
             }
           />
           {value.trim() && (
@@ -665,6 +687,97 @@ function SourceEditModal({ source, categories, onClose, onSaved, onError }: { so
           <CategoryPicker name="source_categories" categories={categories} selected={source.category_ids || []} />
         </div>
         <button className="primary-button"><Check size={17} /> 저장</button>
+      </form>
+    </Modal>
+  );
+}
+
+function VideoImportModal({
+  categories,
+  onClose,
+  onSaved,
+  onError,
+}: {
+  categories: FeedCategory[];
+  onClose: () => void;
+  onSaved: (notice: string) => Promise<void>;
+  onError: (error: unknown) => void;
+}) {
+  const [url, setUrl] = useState("");
+  const [status, setStatus] = useState<VideoStatus>("APPROVED");
+  const [busy, setBusy] = useState(false);
+
+  const videoId = extractVideoId(url.trim());
+  const isValid = Boolean(videoId);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!isValid) return;
+    setBusy(true);
+    const form = new FormData(event.currentTarget);
+    const categoryIds = form.getAll("import_categories").map(String);
+    try {
+      const res = await apiFetch<FeedVideo & { already_existed?: boolean }>("/api/admin/feed/videos/import", {
+        method: "POST",
+        body: JSON.stringify({
+          url: url.trim(),
+          status,
+          category_ids: categoryIds,
+        }),
+      });
+      const statusLabel = res.status === "APPROVED" ? "승인" : "검수 대기";
+      const notice = res.already_existed
+        ? `이미 등록된 영상입니다: ${res.title} (${statusLabel})`
+        : `영상을 성공적으로 가져왔습니다: ${res.title} (${statusLabel})`;
+      await onSaved(notice);
+      onClose();
+    } catch (error) {
+      onError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="영상 직접 가져오기" onClose={onClose}>
+      <form className="drawer-form" onSubmit={submit}>
+        <label>
+          YouTube 영상 URL 또는 ID
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://www.youtube.com/watch?v=... 또는 11자리 ID"
+            required
+            autoFocus
+          />
+          {url.trim() && (
+            <small className={`source-validation validation-${isValid ? "ok" : "error"}`}>
+              {isValid ? `영상 ID 인식됨: ${videoId}` : "유효한 YouTube 영상 URL 또는 11자리 ID를 입력하세요."}
+            </small>
+          )}
+        </label>
+
+        <label>
+          등록 상태
+          <select value={status} onChange={(e) => setStatus(e.target.value as VideoStatus)}>
+            <option value="APPROVED">승인 (앱 피드 노출 가능)</option>
+            <option value="CANDIDATE">검수 대기 (후보 목록으로 등록)</option>
+          </select>
+          <small>승인으로 가져오면 즉시 피드 추천 및 카탈로그 노출 후보가 됩니다.</small>
+        </label>
+
+        <div className="source-form-categories">
+          <div className="source-form-categories-header">
+            <span className="source-form-categories-title">카탈로그 카테고리 (선택)</span>
+            <small>미선택 시 YouTube 분류 및 제목 규칙으로 자동 분류됩니다.</small>
+          </div>
+          <CategoryPicker name="import_categories" categories={categories} selected={[]} />
+        </div>
+
+        <button className="primary-button" disabled={busy || !isValid}>
+          {busy ? <LoaderCircle className="spin" size={17} /> : <Download size={17} />}
+          {busy ? "영상 정보 가져오는 중…" : "영상 가져오기"}
+        </button>
       </form>
     </Modal>
   );

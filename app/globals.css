@@ -290,6 +290,19 @@ button {
     background: white;
 }
 
+.secondary-button:hover {
+    background: var(--paper);
+    border-color: #c2cebf;
+    color: var(--green);
+}
+
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 .collect-button {
     min-width: 168px;
 }
