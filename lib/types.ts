@@ -144,6 +144,17 @@ export interface FeedVideo {
     segment_count: number;
     updated_at: string | null;
   };
+  engagement?: VideoEngagementStats;
+}
+
+export interface VideoEngagementStats {
+  saved_count: number;
+  liked_count: number;
+  expression_count: number;
+  speech_attempt_count: number;
+  learning_session_count: number;
+  watch_count: number;
+  total_watch_seconds: number;
 }
 
 export interface UserSavedVideo {

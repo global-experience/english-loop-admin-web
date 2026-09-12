@@ -1897,6 +1897,90 @@ body:has(.modal-backdrop) {
     max-width: 100%;
 }
 
+.video-engagement-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #f8faf8;
+    border: 1px solid #e2e8df;
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.video-engagement-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.video-engagement-header h4 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.engagement-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 8px;
+}
+
+.engagement-card {
+    background: #ffffff;
+    border: 1px solid #e9eee7;
+    border-radius: 9px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.engagement-card .label {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 500;
+}
+
+.engagement-card .value {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.engagement-guide-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.engagement-guide-box.warning {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+}
+
+.engagement-guide-box.safe {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
+
+.engagement-guide-box strong {
+    font-weight: 700;
+}
+
+
 @keyframes fade-in {
     from {
         opacity: 0;

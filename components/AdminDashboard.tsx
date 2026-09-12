@@ -4,9 +4,9 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  Activity, AlertTriangle, BookMarked, Captions, Check, CheckSquare, ChevronLeft, ChevronRight, CircleOff,
-  ChevronDown, ChevronUp, ClipboardList, Database, Download, ExternalLink,
-  Eye, Gauge, History, LayoutDashboard, LoaderCircle, LogOut, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, RotateCcw,
+  Activity, AlertTriangle, Bookmark, BookMarked, BookOpen, Captions, Check, CheckSquare, ChevronLeft, ChevronRight, CircleOff,
+  Clock, ChevronDown, ChevronUp, ClipboardList, Database, Download, ExternalLink,
+  Eye, Gauge, Heart, History, LayoutDashboard, LoaderCircle, LogOut, Mic, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, RotateCcw,
   Layers, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Square, Trash2, ToggleLeft, ToggleRight, UserCheck,
   Users, UserX, Video, X, Zap,
 } from "lucide-react";
@@ -944,7 +944,55 @@ function VideosPanel(props: { videos: FeedVideo[]; categories: FeedCategory[]; o
 function VideoDetailModal({ videoId, categories, onClose, onError, onNotice }: { videoId: string; categories: FeedCategory[]; onClose: () => void; onError: (error: unknown) => void; onNotice: (message: string) => void }) {
   const [video, setVideo] = useState<FeedVideo | null>(null);
   useEffect(() => { apiFetch<FeedVideo>(`/api/admin/feed/videos/${videoId}`).then(setVideo).catch(onError); }, [videoId, onError]);
-  return <Modal title="피드 영상 미리보기" onClose={onClose}>{!video ? <div className="loading-state"><LoaderCircle className="spin" /></div> : <div className="video-detail"><iframe src={`https://www.youtube-nocookie.com/embed/${video.youtube_video_id}`} title={video.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /><div className="detail-grid"><span>상태 <b>{video.status}</b></span><span>채널 <b>{video.channel_title}</b></span><span>자막 캐시 <b>{video.transcript?.exists ? `${video.transcript.segment_count}개` : "없음"}</b></span><span>임베드 <b>{video.embeddable ? "가능" : "불가"}</b></span></div><p>{video.description || "설명이 없습니다."}</p>{video.created_by_user_id && (
+  return <Modal title="피드 영상 미리보기" onClose={onClose}>{!video ? <div className="loading-state"><LoaderCircle className="spin" /></div> : <div className="video-detail"><iframe src={`https://www.youtube-nocookie.com/embed/${video.youtube_video_id}`} title={video.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /><div className="detail-grid"><span>상태 <b>{video.status}</b></span><span>채널 <b>{video.channel_title}</b></span><span>자막 캐시 <b>{video.transcript?.exists ? `${video.transcript.segment_count}개` : "없음"}</b></span><span>임베드 <b>{video.embeddable ? "가능" : "불가"}</b></span></div>{video.engagement && (
+      <div className="video-engagement-section">
+        <div className="video-engagement-header">
+          <h4><Activity size={15} /> 사용자 반응 및 학습 지표</h4>
+        </div>
+        <div className="engagement-grid">
+          <div className="engagement-card">
+            <span className="label"><Bookmark size={13} /> 찜한 사용자</span>
+            <strong className="value">{video.engagement.saved_count}명</strong>
+          </div>
+          <div className="engagement-card">
+            <span className="label"><Heart size={13} /> 하트</span>
+            <strong className="value">{video.engagement.liked_count}개</strong>
+          </div>
+          <div className="engagement-card">
+            <span className="label"><BookOpen size={13} /> 저장된 단어</span>
+            <strong className="value">{video.engagement.expression_count}개</strong>
+          </div>
+          <div className="engagement-card">
+            <span className="label"><Mic size={13} /> 발화 연습</span>
+            <strong className="value">{video.engagement.speech_attempt_count}회</strong>
+          </div>
+          <div className="engagement-card">
+            <span className="label"><Clock size={13} /> 시청 횟수</span>
+            <strong className="value">
+              {video.engagement.watch_count}회
+              {video.engagement.total_watch_seconds > 0 && (
+                <small style={{ fontWeight: 400, fontSize: "11px", color: "var(--muted)", marginLeft: "4px" }}>
+                  ({Math.round(video.engagement.total_watch_seconds / 60)}분)
+                </small>
+              )}
+            </strong>
+          </div>
+        </div>
+        {video.engagement.saved_count > 0 || video.engagement.expression_count > 0 ? (
+          <div className="engagement-guide-box warning">
+            <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: "2px" }} />
+            <span>
+              이 영상은 <strong>{video.engagement.saved_count}명의 사용자</strong>가 찜하거나 <strong>{video.engagement.expression_count}개의 단어</strong>를 저장해 학습 중입니다. 피드를 삭제하면 사용자의 찜 보관함에서 사라지므로, <strong>'제외'</strong> 처리를 권장합니다.
+            </span>
+          </div>
+        ) : (
+          <div className="engagement-guide-box safe">
+            <ShieldCheck size={16} style={{ flexShrink: 0, marginTop: "2px" }} />
+            <span>아직 사용자의 찜이나 단어 저장이 없는 영상입니다. 안전하게 제외 또는 삭제할 수 있습니다.</span>
+          </div>
+        )}
+      </div>
+    )}<p>{video.description || "설명이 없습니다."}</p>{video.created_by_user_id && (
       <div className="video-origin-card">
         <div>
           <strong>사용자가 가져온 영상</strong>
