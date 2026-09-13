@@ -1688,6 +1688,24 @@ body:has(.modal-backdrop) {
     height: 18px;
 }
 
+/* 소스 추가 폼의 "영어 외 언어 허용" 토글.
+   체크박스와 문구는 한 줄에, 설명은 그 아래 줄에 둔다. */
+.source-language-override {
+    flex-wrap: wrap;
+    gap: 4px 9px !important;
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.source-language-override small {
+    flex-basis: 100%;
+    padding-left: 27px;
+    font-weight: 500;
+    opacity: .8;
+}
+
 .stat-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

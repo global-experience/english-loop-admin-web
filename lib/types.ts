@@ -104,6 +104,8 @@ export interface FeedSource {
   label: string;
   enabled: boolean;
   priority: number;
+  /** 영어 외 언어도 후보로 받을지. 한국어 채널 등 일부러 넣은 소스에만 켠다. */
+  allow_non_english: boolean;
   /** 이 소스로 모은 영상이 들어갈 카탈로그 줄. 자동 분류의 1순위 근거다. */
   category_ids: string[];
   validation?: {

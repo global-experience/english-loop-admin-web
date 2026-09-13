@@ -680,7 +680,7 @@ function SourcesPanel({ sources, categories, reload, onError, onNotice }: { sour
     setBusy(source.id);
     try { await apiFetch(`/api/admin/feed/sources/${source.id}`, { method: "DELETE" }); await reload(); } catch (error) { onError(error); } finally { setBusy(""); }
   }
-  return <section className="panel-stack"><article className="panel"><div className="panel-heading"><div><p className="eyebrow">DISCOVERY INPUTS</p><h2>검색어·채널</h2></div><div className="button-row"><button className="secondary-button" onClick={seedDefaults} disabled={busy === "defaults"}><RefreshCw size={16} /> 기본 소스 채우기</button><button className="primary-button" onClick={() => { setEditing(null); setShowForm(!showForm); }}><Plus size={17} /> 소스 추가</button></div></div>{showForm && <SourceForm categories={categories} onSaved={async () => { setShowForm(false); await reload(); }} onError={onError} />}{sources.length ? <div className="source-list">{sources.map((source) => <article className={source.enabled ? "source-row" : "source-row disabled"} key={source.id}><span className={`type-badge type-${source.source_type.toLowerCase()}`}>{source.source_type}</span><div><strong>{source.label}</strong><span>{source.value}</span>{source.validation && <small className={`source-validation validation-${source.validation.status.toLowerCase()}`}>{source.validation.message}</small>}</div><span className="priority">우선순위 {source.priority}</span><div className="row-actions"><button className="icon-button" onClick={() => collectSource(source)} disabled={busy === `collect:${source.id}`} aria-label="이 소스만 수집"><Sparkles size={17} /></button><button className="icon-button" onClick={() => setEditing(source)} aria-label="수정"><Pencil size={17} /></button><button className="icon-button" onClick={() => toggle(source)} disabled={busy === source.id} aria-label={source.enabled ? "비활성화" : "활성화"}>{source.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}</button><button className="icon-danger" onClick={() => remove(source)} disabled={busy === source.id} aria-label="삭제"><Trash2 size={17} /></button></div></article>)}</div> : <EmptyState title="수집 소스가 없습니다" description="기본 소스를 채우거나 직접 검색어와 채널을 추가하세요." />}</article>{editing && <SourceEditModal source={editing} categories={categories} onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await reload(); }} onError={onError} />}</section>;
+  return <section className="panel-stack"><article className="panel"><div className="panel-heading"><div><p className="eyebrow">DISCOVERY INPUTS</p><h2>검색어·채널</h2></div><div className="button-row"><button className="secondary-button" onClick={seedDefaults} disabled={busy === "defaults"}><RefreshCw size={16} /> 기본 소스 채우기</button><button className="primary-button" onClick={() => { setEditing(null); setShowForm(!showForm); }}><Plus size={17} /> 소스 추가</button></div></div>{showForm && <SourceForm categories={categories} onSaved={async () => { setShowForm(false); await reload(); }} onError={onError} />}{sources.length ? <div className="source-list">{sources.map((source) => <article className={source.enabled ? "source-row" : "source-row disabled"} key={source.id}><span className={`type-badge type-${source.source_type.toLowerCase()}`}>{source.source_type}</span><div><strong>{source.label}</strong><span>{source.value}</span>{source.validation && <small className={`source-validation validation-${source.validation.status.toLowerCase()}`}>{source.validation.message}</small>}</div><span className="priority">우선순위 {source.priority}{source.allow_non_english ? " · 영어 외 허용" : ""}</span><div className="row-actions"><button className="icon-button" onClick={() => collectSource(source)} disabled={busy === `collect:${source.id}`} aria-label="이 소스만 수집"><Sparkles size={17} /></button><button className="icon-button" onClick={() => setEditing(source)} aria-label="수정"><Pencil size={17} /></button><button className="icon-button" onClick={() => toggle(source)} disabled={busy === source.id} aria-label={source.enabled ? "비활성화" : "활성화"}>{source.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}</button><button className="icon-danger" onClick={() => remove(source)} disabled={busy === source.id} aria-label="삭제"><Trash2 size={17} /></button></div></article>)}</div> : <EmptyState title="수집 소스가 없습니다" description="기본 소스를 채우거나 직접 검색어와 채널을 추가하세요." />}</article>{editing && <SourceEditModal source={editing} categories={categories} onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await reload(); }} onError={onError} />}</section>;
 }
 
 function SourceForm({ categories, onSaved, onError }: { categories: FeedCategory[]; onSaved: () => Promise<void>; onError: (error: unknown) => void }) {
@@ -688,6 +688,7 @@ function SourceForm({ categories, onSaved, onError }: { categories: FeedCategory
   const [label, setLabel] = useState("");
   const [value, setValue] = useState("");
   const [priority, setPriority] = useState(60);
+  const [allowNonEnglish, setAllowNonEnglish] = useState(false);
   const [busy, setBusy] = useState(false);
   const validation = validateSourceInput(sourceType, value);
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -698,7 +699,7 @@ function SourceForm({ categories, onSaved, onError }: { categories: FeedCategory
     try {
       await apiFetch("/api/admin/feed/sources", {
         method: "POST",
-        body: JSON.stringify({ source_type: sourceType, label, value, priority, category_ids: categoryIds }),
+        body: JSON.stringify({ source_type: sourceType, label, value, priority, allow_non_english: allowNonEnglish, category_ids: categoryIds }),
       });
       await onSaved();
     } catch (error) { onError(error); } finally { setBusy(false); }
@@ -744,6 +745,11 @@ function SourceForm({ categories, onSaved, onError }: { categories: FeedCategory
           {busy ? "추가 중…" : "추가"}
         </button>
       </div>
+      <label className="check-label source-language-override">
+        <input type="checkbox" checked={allowNonEnglish} onChange={(event) => setAllowNonEnglish(event.target.checked)} />
+        영어 외 언어 허용
+        <small>기본 수집은 영어가 아닌 영상을 버립니다. 한국어 채널처럼 일부러 넣은 소스에만 켜세요.</small>
+      </label>
       <div className="source-form-categories">
         <div className="source-form-categories-header">
           <span className="source-form-categories-title">카탈로그 카테고리</span>
@@ -760,7 +766,7 @@ function SourceEditModal({ source, categories, onClose, onSaved, onError }: { so
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     try {
-      await apiFetch(`/api/admin/feed/sources/${source.id}`, { method: "PATCH", body: JSON.stringify({ label: form.get("label"), value: form.get("value"), priority: Number(form.get("priority")), enabled: form.get("enabled") === "on", category_ids: form.getAll("source_categories").map(String) }) });
+      await apiFetch(`/api/admin/feed/sources/${source.id}`, { method: "PATCH", body: JSON.stringify({ label: form.get("label"), value: form.get("value"), priority: Number(form.get("priority")), enabled: form.get("enabled") === "on", allow_non_english: form.get("allow_non_english") === "on", category_ids: form.getAll("source_categories").map(String) }) });
       await onSaved();
     } catch (error) { onError(error); }
   }
@@ -771,6 +777,7 @@ function SourceEditModal({ source, categories, onClose, onSaved, onError }: { so
         <label>값<input name="value" defaultValue={source.value} required /></label>
         <label>우선순위<input name="priority" type="number" min={0} max={100} defaultValue={source.priority} /></label>
         <label className="check-label"><input name="enabled" type="checkbox" defaultChecked={source.enabled} /> 활성화</label>
+        <label className="check-label"><input name="allow_non_english" type="checkbox" defaultChecked={source.allow_non_english} /> 영어 외 언어 허용</label>
         <div className="source-form-categories">
           <span className="source-form-categories-title">카탈로그 카테고리</span>
           <CategoryPicker name="source_categories" categories={categories} selected={source.category_ids || []} />
