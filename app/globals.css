@@ -2685,3 +2685,199 @@ body:has(.modal-backdrop) {
     color: var(--muted);
     font-size: 12px;
 }
+
+/* ── 어드민 스켈레톤 및 검색 로딩 ── */
+@keyframes admin-shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.admin-shimmer {
+    background: linear-gradient(
+        90deg,
+        #f0f3ee 25%,
+        #e5eae2 50%,
+        #f0f3ee 75%
+    ) !important;
+    background-size: 200% 100% !important;
+    animation: admin-shimmer 1.6s ease-in-out infinite !important;
+}
+
+.skeleton-bar {
+    display: block;
+    height: 14px;
+    border-radius: 6px;
+}
+
+/* 영상 그리드 스켈레톤 */
+.video-card-skeleton {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: white;
+    overflow: hidden;
+}
+
+.video-card-skeleton .skeleton-thumb {
+    width: 100%;
+    aspect-ratio: 16/9;
+}
+
+.video-card-skeleton .skeleton-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.video-card-skeleton .skeleton-badge-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.video-card-skeleton .skeleton-badge {
+    height: 18px;
+    width: 52px;
+    border-radius: 99px;
+}
+
+.video-card-skeleton .skeleton-title-1 {
+    width: 90%;
+    height: 16px;
+}
+
+.video-card-skeleton .skeleton-title-2 {
+    width: 65%;
+    height: 16px;
+}
+
+.video-card-skeleton .skeleton-channel {
+    width: 40%;
+    height: 12px;
+    margin-top: 2px;
+}
+
+.video-card-skeleton .skeleton-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.video-card-skeleton .skeleton-btn {
+    height: 30px;
+    width: 60px;
+    border-radius: 8px;
+}
+
+/* 유저 리스트 스켈레톤 */
+.user-row-skeleton {
+    min-height: 78px;
+    border-top: 1px solid #edf0eb;
+    display: grid;
+    align-items: center;
+    gap: 14px;
+    grid-template-columns: 112px minmax(0, 1fr) 80px 140px;
+    padding: 12px 0;
+}
+
+.user-row-skeleton:first-child {
+    border-top: 0;
+}
+
+.user-row-skeleton .skeleton-status {
+    height: 24px;
+    width: 70px;
+    border-radius: 99px;
+}
+
+.user-row-skeleton .skeleton-user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* 테이블/행 스켈레톤 (표현, 자막, 리포트 등) */
+.table-skeleton-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 0;
+}
+
+.table-row-skeleton {
+    height: 52px;
+    border-radius: 10px;
+    border: 1px solid #edf0eb;
+}
+
+/* 검색 폼 로딩 스피너 */
+.search-form .search-button.loading {
+    opacity: 0.85;
+    pointer-events: none;
+}
+
+/* ── 일괄 카테고리 설정 모달 ── */
+.batch-category-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.batch-category-info {
+    padding: 12px 14px;
+    background: #f5f7f2;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font-size: 13.5px;
+    color: var(--ink);
+    line-height: 1.5;
+}
+
+.batch-category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.batch-category-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: white;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all .15s ease;
+    user-select: none;
+}
+
+.batch-category-item:hover {
+    border-color: var(--green);
+    background: #f9fbf8;
+}
+
+.batch-category-item.selected {
+    border-color: var(--green);
+    background: #eaf4e6;
+    color: #1a5632;
+    font-weight: 600;
+}
+
+.batch-category-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+}
+

@@ -7,7 +7,7 @@ import {
   Activity, AlertTriangle, Bookmark, BookMarked, BookOpen, Captions, Check, CheckSquare, ChevronLeft, ChevronRight, CircleOff,
   Clock, ChevronDown, ChevronUp, ClipboardList, Database, Download, ExternalLink,
   Eye, Gauge, Heart, History, LayoutDashboard, LoaderCircle, LogOut, Mic, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, RotateCcw,
-  Layers, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Square, Trash2, ToggleLeft, ToggleRight, UserCheck,
+  Layers, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Square, Tag, Trash2, ToggleLeft, ToggleRight, UserCheck,
   Users, UserX, Video, X, Zap,
 } from "lucide-react";
 import { ApiError, apiFetch } from "@/lib/api";
@@ -155,6 +155,7 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
   const [quality, setQuality] = useState<RecommendationQuality | null>(null);
   const [qualityDays, setQualityDays] = useState(7);
   const [loading, setLoading] = useState(true);
+  const [initialLoadedTabs, setInitialLoadedTabs] = useState<Partial<Record<Tab, boolean>>>({});
   const [collecting, setCollecting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -353,8 +354,13 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
   useEffect(() => {
     setLoading(true);
     setError("");
-    activeLoader().catch(handleError).finally(() => setLoading(false));
-  }, [activeLoader, handleError]);
+    activeLoader()
+      .catch(handleError)
+      .finally(() => {
+        setLoading(false);
+        setInitialLoadedTabs((prev) => ({ ...prev, [tab]: true }));
+      });
+  }, [activeLoader, handleError, tab]);
 
   // 카테고리는 소스, 영상 상세, 직접 가져오기 등 여러 곳에서 공유하므로 마운트 시에도 확보해 둔다.
   useEffect(() => {
@@ -454,17 +460,17 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
         </header>
         {error && <div className="alert error"><CircleOff size={18} />{error}<button onClick={() => setError("")}><X size={16} /></button></div>}
         {notice && <div className="alert success"><Check size={18} />{notice}<button onClick={() => setNotice("")}><X size={16} /></button></div>}
-        {loading ? <div className="loading-state"><LoaderCircle className="spin" /><p>데이터를 불러오는 중입니다.</p></div> : (
+        {loading && !initialLoadedTabs[tab] ? <div className="loading-state"><LoaderCircle className="spin" /><p>데이터를 불러오는 중입니다.</p></div> : (
           <>
             {tab === "overview" && overview && <OverviewPanel data={overview} onNavigate={navigate} />}
-            {tab === "users" && <UsersPanel users={users} members={members} status={userStatus} setStatus={(next) => { handlePageReset(); setUserStatus(next); }} search={userSearch} setSearch={(next) => { handlePageReset(); setUserSearch(next); }} reload={loadUsers} onError={handleError} total={userTotal} page={userPage} setPage={handlePageChange} />}
+            {tab === "users" && <UsersPanel users={users} members={members} status={userStatus} setStatus={(next) => { handlePageReset(); setUserStatus(next); }} search={userSearch} setSearch={(next) => { handlePageReset(); setUserSearch(next); }} reload={loadUsers} onError={handleError} total={userTotal} page={userPage} setPage={handlePageChange} loading={loading} />}
             {tab === "categories" && <CategoriesPanel categories={categories} reload={loadCategories} onError={handleError} onNotice={setNotice} />}
             {tab === "sources" && <SourcesPanel sources={sources} categories={categories} reload={loadSources} onError={handleError} onNotice={setNotice} />}
-            {tab === "videos" && <VideosPanel videos={videos} categories={categories} origin={origin} setOrigin={(next) => { handlePageReset(); setOrigin(next); setVisibility(""); }} visibility={visibility} setVisibility={(next) => { handlePageReset(); setVisibility(next); }} status={status} setStatus={(next) => { handlePageReset(); setStatus(next); }} categoryId={categoryId} setCategoryId={(next) => { handlePageReset(); setCategoryId(next); }} sort={sort} setSort={(next) => { handlePageReset(); setSort(next); }} search={search} setSearch={(next) => { handlePageReset(); setSearch(next); }} reload={loadVideos} onError={handleError} total={total} page={page} setPage={handlePageChange} onNotice={setNotice} />}
-            {tab === "expressions" && <ExpressionsPanel expressions={expressions} total={expressionTotal} page={expressionPage} setPage={handlePageChange} search={expressionSearch} setSearch={(next) => { handlePageReset(); setExpressionSearch(next); }} level={expressionLevel} setLevel={(next) => { handlePageReset(); setExpressionLevel(next); }} reload={loadExpressions} onError={handleError} />}
+            {tab === "videos" && <VideosPanel videos={videos} categories={categories} origin={origin} setOrigin={(next) => { handlePageReset(); setOrigin(next); setVisibility(""); }} visibility={visibility} setVisibility={(next) => { handlePageReset(); setVisibility(next); }} status={status} setStatus={(next) => { handlePageReset(); setStatus(next); }} categoryId={categoryId} setCategoryId={(next) => { handlePageReset(); setCategoryId(next); }} sort={sort} setSort={(next) => { handlePageReset(); setSort(next); }} search={search} setSearch={(next) => { handlePageReset(); setSearch(next); }} reload={loadVideos} onError={handleError} total={total} page={page} setPage={handlePageChange} onNotice={setNotice} loading={loading} />}
+            {tab === "expressions" && <ExpressionsPanel expressions={expressions} total={expressionTotal} page={expressionPage} setPage={handlePageChange} search={expressionSearch} setSearch={(next) => { handlePageReset(); setExpressionSearch(next); }} level={expressionLevel} setLevel={(next) => { handlePageReset(); setExpressionLevel(next); }} reload={loadExpressions} onError={handleError} loading={loading} />}
             {tab === "jobs" && <JobsPanel jobs={jobs} workers={workers} total={jobTotal} page={jobPage} setPage={handlePageChange} status={jobStatus} setStatus={(next) => { handlePageReset(); setJobStatus(next); }} reload={loadJobs} onError={handleError} />}
-            {tab === "transcripts" && <TranscriptsPanel stats={transcriptStats} rows={transcripts} total={transcriptTotal} page={transcriptPage} setPage={handlePageChange} search={transcriptSearch} setSearch={(next) => { handlePageReset(); setTranscriptSearch(next); }} source={transcriptSource} setSource={(next) => { handlePageReset(); setTranscriptSource(next); }} onlyStale={transcriptStale} setOnlyStale={(next) => { handlePageReset(); setTranscriptStale(next); }} reload={loadTranscripts} onError={handleError} onNotice={setNotice} />}
-            {tab === "reports" && <ReportsPanel health={reportHealth} rows={reports} total={reportTotal} page={reportPage} setPage={handlePageChange} search={reportSearch} setSearch={(next) => { handlePageReset(); setReportSearch(next); }} confidence={reportConfidence} setConfidence={(next) => { handlePageReset(); setReportConfidence(next); }} reload={loadReports} />}
+            {tab === "transcripts" && <TranscriptsPanel stats={transcriptStats} rows={transcripts} total={transcriptTotal} page={transcriptPage} setPage={handlePageChange} search={transcriptSearch} setSearch={(next) => { handlePageReset(); setTranscriptSearch(next); }} source={transcriptSource} setSource={(next) => { handlePageReset(); setTranscriptSource(next); }} onlyStale={transcriptStale} setOnlyStale={(next) => { handlePageReset(); setTranscriptStale(next); }} reload={loadTranscripts} onError={handleError} onNotice={setNotice} loading={loading} />}
+            {tab === "reports" && <ReportsPanel health={reportHealth} rows={reports} total={reportTotal} page={reportPage} setPage={handlePageChange} search={reportSearch} setSearch={(next) => { handlePageReset(); setReportSearch(next); }} confidence={reportConfidence} setConfidence={(next) => { handlePageReset(); setReportConfidence(next); }} reload={loadReports} loading={loading} />}
             {tab === "quality" && <QualityPanel data={quality} days={qualityDays} setDays={setQualityDays} reload={loadQuality} />}
             {tab === "runs" && <RunsPanel runs={runs} />}
             {tab === "settings" && <SettingsPanel items={runtimeSettings} reload={loadSettings} onError={handleError} onNotice={setNotice} />}
@@ -487,8 +493,70 @@ export function AdminDashboard({ tab }: { tab: Tab }) {
   );
 }
 
-function SearchForm(props: { value: string; onSearch: (value: string) => void; placeholder: string }) {
-  const { value, onSearch, placeholder } = props;
+function VideoGridSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="video-grid" aria-busy="true" aria-label="영상을 불러오는 중입니다">
+      {Array.from({ length: count }).map((_, i) => (
+        <article className="video-card-skeleton" key={i}>
+          <div className="skeleton-thumb admin-shimmer" />
+          <div className="skeleton-body">
+            <div className="skeleton-badge-row">
+              <span className="skeleton-badge admin-shimmer" />
+              <span className="skeleton-badge admin-shimmer" style={{ width: 36 }} />
+            </div>
+            <span className="skeleton-bar skeleton-title-1 admin-shimmer" />
+            <span className="skeleton-bar skeleton-title-2 admin-shimmer" />
+            <span className="skeleton-bar skeleton-channel admin-shimmer" />
+            <div className="skeleton-actions">
+              <span className="skeleton-btn admin-shimmer" />
+              <span className="skeleton-btn admin-shimmer" />
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function UserListSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="user-list" aria-busy="true" aria-label="사용자 목록을 불러오는 중입니다">
+      {Array.from({ length: count }).map((_, i) => (
+        <article className="user-row-skeleton" key={i}>
+          <span className="skeleton-status admin-shimmer" />
+          <div className="skeleton-user-info">
+            <span className="skeleton-bar admin-shimmer" style={{ width: 140, height: 16 }} />
+            <span className="skeleton-bar admin-shimmer" style={{ width: 220, height: 13 }} />
+            <span className="skeleton-bar admin-shimmer" style={{ width: 180, height: 11 }} />
+          </div>
+          <span className="skeleton-bar admin-shimmer" style={{ width: 65, height: 13 }} />
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <span className="skeleton-bar admin-shimmer" style={{ width: 60, height: 32, borderRadius: 8 }} />
+            <span className="skeleton-bar admin-shimmer" style={{ width: 60, height: 32, borderRadius: 8 }} />
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function TableSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <div className="table-skeleton-wrap" aria-busy="true" aria-label="데이터를 불러오는 중입니다">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div className="table-row-skeleton admin-shimmer" key={i} />
+      ))}
+    </div>
+  );
+}
+
+function SearchForm(props: {
+  value: string;
+  onSearch: (value: string) => void;
+  placeholder: string;
+  loading?: boolean;
+}) {
+  const { value, onSearch, placeholder, loading } = props;
   const [query, setQuery] = useState(value);
 
   useEffect(() => {
@@ -513,15 +581,20 @@ function SearchForm(props: { value: string; onSearch: (value: string) => void; p
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={placeholder}
+          disabled={loading}
         />
         {query ? (
-          <button type="button" className="search-clear-button" onClick={clear} title="검색어 초기화">
+          <button type="button" className="search-clear-button" onClick={clear} title="검색어 초기화" disabled={loading}>
             <X size={15} />
           </button>
         ) : null}
       </div>
-      <button type="submit" className="primary-button search-button">
-        검색
+      <button
+        type="submit"
+        className={`primary-button search-button${loading ? " loading" : ""}`}
+        disabled={loading}
+      >
+        {loading ? <LoaderCircle size={16} className="spin" /> : "검색"}
       </button>
     </form>
   );
@@ -576,8 +649,21 @@ function OverviewPanel({ data, onNavigate }: { data: Overview; onNavigate: (tab:
   return <section className="panel-stack"><div className="metric-grid">{metrics.map((metric) => <button className="metric-card" key={metric.label} onClick={() => onNavigate(metric.tab)}><span className="metric-icon"><metric.icon size={20} /></span><span>{metric.label}</span><strong>{metric.value.toLocaleString()}</strong><small>{metric.detail}</small></button>)}</div>{healthMetrics.length > 0 && <div className="metric-grid">{healthMetrics.map((metric) => <button className={metric.warn ? "metric-card warn" : "metric-card"} key={metric.label} onClick={() => onNavigate(metric.tab)}><span className="metric-icon"><metric.icon size={20} /></span><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.detail}</small></button>)}</div>}<article className="panel"><div className="panel-heading"><div><p className="eyebrow">LAST COLLECTION</p><h2>최근 수집 상태</h2></div><button className="text-button" onClick={() => onNavigate("runs")}>전체 기록 <ChevronRight size={16} /></button></div>{data.last_run ? <RunRow run={data.last_run} /> : <EmptyState title="아직 수집 기록이 없습니다" description="수집 소스를 준비한 뒤 후보 영상 수집을 실행하세요." />}</article></section>;
 }
 
-function UsersPanel(props: { users: AdminUser[]; members: AdminMember[]; status: UserApprovalStatus | ""; setStatus: (status: UserApprovalStatus | "") => void; search: string; setSearch: (value: string) => void; reload: () => Promise<void>; onError: (error: unknown) => void; total: number; page: number; setPage: (page: number) => void }) {
-  const { users, members, status, setStatus, search, setSearch, reload, onError, total, page, setPage } = props;
+function UsersPanel(props: {
+  users: AdminUser[];
+  members: AdminMember[];
+  status: UserApprovalStatus | "";
+  setStatus: (status: UserApprovalStatus | "") => void;
+  search: string;
+  setSearch: (value: string) => void;
+  reload: () => Promise<void>;
+  onError: (error: unknown) => void;
+  total: number;
+  page: number;
+  setPage: (page: number) => void;
+  loading?: boolean;
+}) {
+  const { users, members, status, setStatus, search, setSearch, reload, onError, total, page, setPage, loading } = props;
   const [busy, setBusy] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminRole, setAdminRole] = useState<AdminRole>("ADMIN");
@@ -605,7 +691,108 @@ function UsersPanel(props: { users: AdminUser[]; members: AdminMember[]; status:
     try { await apiFetch(`/api/admin/members/${member.user_id}`, { method: "DELETE" }); await reload(); } catch (error) { onError(error); } finally { setBusy(""); }
   }
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  return <section className="panel-stack"><article className="panel"><div className="panel-heading"><div><p className="eyebrow">ACCOUNT APPROVAL</p><h2>회원 가입 승인</h2></div></div><div className="filters"><SearchForm value={search} onSearch={setSearch} placeholder="이메일 또는 이름 검색" /><select value={status} onChange={(event) => setStatus(event.target.value as UserApprovalStatus | "")}><option value="">모든 상태</option><option value="PENDING">승인 대기</option><option value="APPROVED">승인됨</option><option value="REJECTED">거절됨</option></select><span className="result-count">{total.toLocaleString()}명</span></div>{users.length ? <div className="user-list">{users.map((user) => <article className="user-row clickable" key={user.id} onClick={() => setDetailUserId(user.id)}><span className={`user-status status-${user.approval_status.toLowerCase()}`}>{user.approval_status}</span><div><strong>{user.display_name}</strong><span>{user.email}</span><small>{user.english_level} · {user.goals.join(", ") || "목표 없음"}{user.is_admin ? ` · ${user.admin_role} 관리자` : ""}</small></div><span className="joined-at">{dateLabel(user.created_at)}</span><div className="user-actions" onClick={(event) => event.stopPropagation()}>{user.approval_status !== "APPROVED" && <button className="approve-button" onClick={() => approve(user)} disabled={busy === user.id}><UserCheck size={17} /> 승인</button>}{user.approval_status !== "REJECTED" && <button className="reject-button" onClick={() => reject(user)} disabled={busy === user.id}><UserX size={17} /> 거절</button>}</div></article>)}</div> : <EmptyState title="조건에 맞는 사용자가 없습니다" description="필터를 바꾸거나 새 가입 요청을 기다려 주세요." />}<Pagination page={page} pages={pages} setPage={setPage} /></article><article className="panel"><div className="panel-heading"><div><p className="eyebrow">ADMIN MEMBERS</p><h2>관리자 계정</h2></div></div><form className="admin-member-form" onSubmit={addAdmin}><label>관리자 이메일<input type="email" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} placeholder="승인된 사용자 이메일" required /></label><label>권한<select value={adminRole} onChange={(event) => setAdminRole(event.target.value as AdminRole)}><option value="ADMIN">ADMIN</option><option value="OWNER">OWNER</option></select></label><button className="primary-button" disabled={busy === "add-admin"}><ShieldCheck size={17} /> 추가</button></form>{members.length ? <div className="member-list">{members.map((member) => <article className="member-row" key={member.id}><span className="member-icon" style={{ display: "flex" }}><span style={{ display: 'flex', margin: "auto" }}><ShieldCheck size={18} /></span></span><div><strong>{member.display_name}</strong><span>{member.email}</span></div><span className="type-badge type-channel">{member.role}</span><button className="reject-button" onClick={() => removeAdmin(member)} disabled={busy === member.user_id}><X size={17} /> 제거</button></article>)}</div> : <EmptyState title="등록된 관리자가 없습니다" description="최초 관리자는 부트스트랩 계정으로 접속하면 생성됩니다." />}</article>{detailUserId && <UserDetailDrawer userId={detailUserId} onClose={() => setDetailUserId("")} onSaved={reload} onError={onError} />}</section>;
+  return (
+    <section className="panel-stack">
+      <article className="panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">ACCOUNT APPROVAL</p>
+            <h2>회원 가입 승인</h2>
+          </div>
+        </div>
+        <div className="filters">
+          <SearchForm value={search} onSearch={setSearch} placeholder="이메일 또는 이름 검색" loading={loading} />
+          <select value={status} onChange={(event) => setStatus(event.target.value as UserApprovalStatus | "")}>
+            <option value="">모든 상태</option>
+            <option value="PENDING">승인 대기</option>
+            <option value="APPROVED">승인됨</option>
+            <option value="REJECTED">거절됨</option>
+          </select>
+          <span className="result-count">{total.toLocaleString()}명</span>
+        </div>
+        {loading ? (
+          <UserListSkeleton count={6} />
+        ) : users.length ? (
+          <div className="user-list">
+            {users.map((user) => (
+              <article className="user-row clickable" key={user.id} onClick={() => setDetailUserId(user.id)}>
+                <span className={`user-status status-${user.approval_status.toLowerCase()}`}>{user.approval_status}</span>
+                <div>
+                  <strong>{user.display_name}</strong>
+                  <span>{user.email}</span>
+                  <small>{user.english_level} · {user.goals.join(", ") || "목표 없음"}{user.is_admin ? ` · ${user.admin_role} 관리자` : ""}</small>
+                </div>
+                <span className="joined-at">{dateLabel(user.created_at)}</span>
+                <div className="user-actions" onClick={(event) => event.stopPropagation()}>
+                  {user.approval_status !== "APPROVED" && (
+                    <button className="approve-button" onClick={() => approve(user)} disabled={busy === user.id}>
+                      <UserCheck size={17} /> 승인
+                    </button>
+                  )}
+                  {user.approval_status !== "REJECTED" && (
+                    <button className="reject-button" onClick={() => reject(user)} disabled={busy === user.id}>
+                      <UserX size={17} /> 거절
+                    </button>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="조건에 맞는 사용자가 없습니다" description="필터를 바꾸거나 새 가입 요청을 기다려 주세요." />
+        )}
+        <Pagination page={page} pages={pages} setPage={setPage} />
+      </article>
+      <article className="panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">ADMIN MEMBERS</p>
+            <h2>관리자 계정</h2>
+          </div>
+        </div>
+        <form className="admin-member-form" onSubmit={addAdmin}>
+          <label>
+            관리자 이메일
+            <input type="email" value={adminEmail} onChange={(event) => setAdminEmail(event.target.value)} placeholder="승인된 사용자 이메일" required />
+          </label>
+          <label>
+            권한
+            <select value={adminRole} onChange={(event) => setAdminRole(event.target.value as AdminRole)}>
+              <option value="ADMIN">ADMIN</option>
+              <option value="OWNER">OWNER</option>
+            </select>
+          </label>
+          <button className="primary-button" disabled={busy === "add-admin"}>
+            <ShieldCheck size={17} /> 추가
+          </button>
+        </form>
+        {members.length ? (
+          <div className="member-list">
+            {members.map((member) => (
+              <article className="member-row" key={member.id}>
+                <span className="member-icon" style={{ display: "flex" }}>
+                  <span style={{ display: "flex", margin: "auto" }}>
+                    <ShieldCheck size={18} />
+                  </span>
+                </span>
+                <div>
+                  <strong>{member.display_name}</strong>
+                  <span>{member.email}</span>
+                </div>
+                <span className="type-badge type-channel">{member.role}</span>
+                <button className="reject-button" onClick={() => removeAdmin(member)} disabled={busy === member.user_id}>
+                  <X size={17} /> 제거
+                </button>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="등록된 관리자가 없습니다" description="최초 관리자는 부트스트랩 계정으로 접속하면 생성됩니다." />
+        )}
+      </article>
+      {detailUserId && <UserDetailDrawer userId={detailUserId} onClose={() => setDetailUserId("")} onSaved={reload} onError={onError} />}
+    </section>
+  );
 }
 
 function UserDetailDrawer({ userId, onClose, onSaved, onError }: { userId: string; onClose: () => void; onSaved: () => Promise<void>; onError: (error: unknown) => void }) {
@@ -898,11 +1085,136 @@ function describeRun(run: CollectionRun): string {
   return run.error_message ? `${base} (${run.error_message})` : base;
 }
 
-function VideosPanel(props: { videos: FeedVideo[]; categories: FeedCategory[]; origin: VideoOrigin; setOrigin: (value: VideoOrigin) => void; visibility: VideoVisibility; setVisibility: (value: VideoVisibility) => void; status: VideoStatus | ""; setStatus: (status: VideoStatus | "") => void; categoryId: string; setCategoryId: (value: string) => void; sort: VideoSort; setSort: (value: VideoSort) => void; search: string; setSearch: (value: string) => void; reload: () => Promise<void>; onError: (error: unknown) => void; total: number; page: number; setPage: (page: number) => void; onNotice: (message: string) => void }) {
-  const { videos, categories, origin, setOrigin, visibility, setVisibility, status, setStatus, categoryId, setCategoryId, sort, setSort, search, setSearch, reload, onError, total, page, setPage, onNotice } = props;
+function BatchCategoryModal(props: {
+  videoIds: string[];
+  categories: FeedCategory[];
+  onClose: () => void;
+  onSuccess: (message: string) => void;
+  onError: (error: unknown) => void;
+  reload: () => Promise<void>;
+}) {
+  const { videoIds, categories, onClose, onSuccess, onError, reload } = props;
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const toggleCategory = (id: string) => {
+    setSelectedCategoryIds((prev) =>
+      prev.includes(id) ? prev.filter((catId) => catId !== id) : [...prev, id]
+    );
+  };
+
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      await apiFetch("/api/admin/feed/videos/batch-categories", {
+        method: "POST",
+        body: JSON.stringify({
+          video_ids: videoIds,
+          category_ids: selectedCategoryIds,
+        }),
+      });
+      await reload();
+      onSuccess(`선택한 ${videoIds.length}개 영상의 카테고리를 변경했습니다.`);
+      onClose();
+    } catch (err) {
+      onError(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal title={`카테고리 일괄 설정 (${videoIds.length}개 선택)`} onClose={onClose}>
+      <div className="batch-category-modal">
+        <div className="batch-category-info">
+          선택한 <strong>{videoIds.length}개 영상</strong>에 적용할 카테고리를 선택하세요.
+          <br />
+          <small style={{ color: "var(--muted)" }}>* 적용 시 기존 카테고리는 선택한 카테고리 목록으로 일괄 대체됩니다.</small>
+        </div>
+        <div className="batch-category-grid">
+          {categories.map((c) => {
+            const isSelected = selectedCategoryIds.includes(c.id);
+            return (
+              <div
+                key={c.id}
+                className={`batch-category-item${isSelected ? " selected" : ""}`}
+                onClick={() => toggleCategory(c.id)}
+              >
+                {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                <span>{c.label}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="batch-category-actions">
+          <button type="button" className="secondary-button" onClick={onClose} disabled={submitting}>
+            취소
+          </button>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={submit}
+            disabled={submitting}
+          >
+            {submitting ? <LoaderCircle className="spin" size={16} /> : <Check size={16} />}
+            {selectedCategoryIds.length === 0 ? "카테고리 모두 해제하여 적용" : `${selectedCategoryIds.length}개 카테고리 적용`}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function VideosPanel(props: {
+  videos: FeedVideo[];
+  categories: FeedCategory[];
+  origin: VideoOrigin;
+  setOrigin: (value: VideoOrigin) => void;
+  visibility: VideoVisibility;
+  setVisibility: (value: VideoVisibility) => void;
+  status: VideoStatus | "";
+  setStatus: (status: VideoStatus | "") => void;
+  categoryId: string;
+  setCategoryId: (value: string) => void;
+  sort: VideoSort;
+  setSort: (value: VideoSort) => void;
+  search: string;
+  setSearch: (value: string) => void;
+  reload: () => Promise<void>;
+  onError: (error: unknown) => void;
+  total: number;
+  page: number;
+  setPage: (page: number) => void;
+  onNotice: (message: string) => void;
+  loading?: boolean;
+}) {
+  const {
+    videos,
+    categories,
+    origin,
+    setOrigin,
+    visibility,
+    setVisibility,
+    status,
+    setStatus,
+    categoryId,
+    setCategoryId,
+    sort,
+    setSort,
+    search,
+    setSearch,
+    reload,
+    onError,
+    total,
+    page,
+    setPage,
+    onNotice,
+    loading,
+  } = props;
   const [busy, setBusy] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [detailId, setDetailId] = useState("");
+  const [batchCategoryOpen, setBatchCategoryOpen] = useState(false);
 
   const currentPageIds = useMemo(() => videos.map((v) => v.id), [videos]);
   const isAllSelected = useMemo(
@@ -928,26 +1240,220 @@ function VideosPanel(props: { videos: FeedVideo[]; categories: FeedCategory[]; o
 
   async function decide(video: FeedVideo, next: VideoStatus) {
     setBusy(video.id);
-    try { await apiFetch(`/api/admin/feed/videos/${video.id}`, { method: "PATCH", body: JSON.stringify({ status: next }) }); await reload(); } catch (error) { onError(error); } finally { setBusy(""); }
+    try {
+      await apiFetch(`/api/admin/feed/videos/${video.id}`, { method: "PATCH", body: JSON.stringify({ status: next }) });
+      await reload();
+    } catch (error) {
+      onError(error);
+    } finally {
+      setBusy("");
+    }
   }
+
   async function remove(video: FeedVideo) {
     if (!window.confirm(`"${video.title}" 영상을 삭제할까요?`)) return;
     setBusy(video.id);
-    try { await apiFetch(`/api/admin/feed/videos/${video.id}`, { method: "DELETE" }); await reload(); } catch (error) { onError(error); } finally { setBusy(""); }
+    try {
+      await apiFetch(`/api/admin/feed/videos/${video.id}`, { method: "DELETE" });
+      await reload();
+    } catch (error) {
+      onError(error);
+    } finally {
+      setBusy("");
+    }
   }
+
   async function batch(next: VideoStatus | "DELETE") {
     if (!selected.length) return;
     if (next === "DELETE") {
       if (!window.confirm(`${selected.length}개 영상을 삭제할까요?`)) return;
       setBusy("batch");
-      try { await Promise.all(selected.map((id) => apiFetch(`/api/admin/feed/videos/${id}`, { method: "DELETE" }))); setSelected([]); await reload(); onNotice("선택 영상을 삭제했습니다."); } catch (error) { onError(error); } finally { setBusy(""); }
+      try {
+        await Promise.all(selected.map((id) => apiFetch(`/api/admin/feed/videos/${id}`, { method: "DELETE" })));
+        setSelected([]);
+        await reload();
+        onNotice("선택 영상을 삭제했습니다.");
+      } catch (error) {
+        onError(error);
+      } finally {
+        setBusy("");
+      }
       return;
     }
     setBusy("batch");
-    try { await apiFetch("/api/admin/feed/videos/batch-status", { method: "POST", body: JSON.stringify({ video_ids: selected, status: next }) }); setSelected([]); await reload(); onNotice(`선택 영상을 ${next} 상태로 변경했습니다.`); } catch (error) { onError(error); } finally { setBusy(""); }
+    try {
+      await apiFetch("/api/admin/feed/videos/batch-status", { method: "POST", body: JSON.stringify({ video_ids: selected, status: next }) });
+      setSelected([]);
+      await reload();
+      onNotice(`선택 영상을 ${next} 상태로 변경했습니다.`);
+    } catch (error) {
+      onError(error);
+    } finally {
+      setBusy("");
+    }
   }
+
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  return <section className="panel-stack"><div className="filters"><SearchForm value={search} onSearch={setSearch} placeholder="제목 또는 채널 검색" /><select value={status} onChange={(event) => setStatus(event.target.value as VideoStatus | "")}><option value="">모든 상태</option><option value="CANDIDATE">검수 대기</option><option value="APPROVED">승인</option><option value="REJECTED">거절</option><option value="HIDDEN">숨김</option></select><select value={origin} onChange={(event) => setOrigin(event.target.value as VideoOrigin)}><option value="">모든 출처</option><option value="ADMIN">수집기</option><option value="USER">사용자 가져오기</option></select>{origin === "USER" && <select value={visibility} onChange={(event) => setVisibility(event.target.value as VideoVisibility)} aria-label="공개 범위"><option value="">공개·비공개 모두</option><option value="PUBLIC">공개</option><option value="PRIVATE">비공개</option></select>}<select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} aria-label="카테고리"><option value="">모든 카테고리</option><option value="uncategorized">미분류 영상</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select><select value={sort} onChange={(event) => setSort(event.target.value as VideoSort)} aria-label="정렬">{VIDEO_SORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><button type="button" className={`select-all-button${isAllSelected ? " selected" : ""}`} onClick={toggleSelectAll} disabled={!videos.length} title={isAllSelected ? "현재 페이지 전체 선택 해제" : "현재 페이지 모든 영상 선택"}>{isAllSelected ? <CheckSquare size={16} /> : <Square size={16} />}<span>{isAllSelected ? "선택 해제" : "전체 선택"}</span></button><span className="result-count">{total.toLocaleString()}개</span></div>{selected.length > 0 && <div className="batch-bar"><button type="button" className="select-toggle-btn button-reset" onClick={toggleSelectAll} title={isAllSelected ? "현재 페이지 전체 선택 해제" : "현재 페이지 모든 영상 선택"}>{isAllSelected ? <CheckSquare size={15} /> : <Square size={15} />}<span>{isAllSelected ? "선택 해제" : "전체 선택"}</span></button><strong>{selected.length}개 선택</strong><button disabled={busy === "batch"} onClick={() => batch("APPROVED")}>승인</button><button disabled={busy === "batch"} onClick={() => batch("HIDDEN")}>숨김</button><button disabled={busy === "batch"} onClick={() => batch("DELETE")} className="danger-text">삭제</button></div>}{videos.length ? <div className="video-grid">{videos.map((video) => <article className="video-card" key={video.id}><label className="video-check"><input type="checkbox" checked={selected.includes(video.id)} onChange={(event) => setSelected((items) => event.target.checked ? [...items, video.id] : items.filter((id) => id !== video.id))} /></label><button className="thumbnail button-reset" onClick={() => setDetailId(video.id)}><img src={video.thumbnail_url} alt="" /><span>{durationLabel(video.duration_seconds)}</span></button><div className="video-body"><div className="video-badges"><span className={statusClass(video.status)}>{video.status}</span><span className="score">{video.base_score}점</span>{video.caption_available && <span className="caption-badge">CC</span>}{video.created_by_user_id && <span className="origin-badge" title={video.created_by || "사용자가 가져온 영상"}>사용자</span>}{video.created_by_user_id && video.visibility === "PUBLIC" && <span className="origin-badge public">공개됨</span>}{video.categories && video.categories.map((c) => <span key={c.id} className="category-badge">{c.label}</span>)}</div><h3>{video.title}</h3><p>{video.channel_title}</p><small>{dateLabel(video.published_at)}</small><div className="video-actions"><button className="icon-button" onClick={() => setDetailId(video.id)} aria-label="미리보기"><Eye size={17} /></button><a className="icon-button" href={video.youtube_url} target="_blank" rel="noreferrer" aria-label="YouTube에서 열기"><ExternalLink size={17} /></a><button className="reject-button" onClick={() => decide(video, "REJECTED")} disabled={busy === video.id}><X size={17} /> 제외</button><button className="approve-button" onClick={() => decide(video, "APPROVED")} disabled={busy === video.id}><Check size={17} /> 승인</button><button className="icon-danger" onClick={() => remove(video)} disabled={busy === video.id}><Trash2 size={17} /></button></div></div></article>)}</div> : <EmptyState title="조건에 맞는 영상이 없습니다" description="필터를 바꾸거나 새 후보를 수집해 보세요." />}<Pagination page={page} pages={pages} setPage={setPage} />{detailId && <VideoDetailModal videoId={detailId} categories={categories} onClose={() => setDetailId("")} onError={onError} onNotice={onNotice} />}</section>;
+  return (
+    <section className="panel-stack">
+      <div className="filters">
+        <SearchForm value={search} onSearch={setSearch} placeholder="제목 또는 채널 검색" loading={loading} />
+        <select value={status} onChange={(event) => setStatus(event.target.value as VideoStatus | "")}>
+          <option value="">모든 상태</option>
+          <option value="CANDIDATE">검수 대기</option>
+          <option value="APPROVED">승인</option>
+          <option value="REJECTED">거절</option>
+          <option value="HIDDEN">숨김</option>
+        </select>
+        <select value={origin} onChange={(event) => setOrigin(event.target.value as VideoOrigin)}>
+          <option value="">모든 출처</option>
+          <option value="ADMIN">수집기</option>
+          <option value="USER">사용자 가져오기</option>
+        </select>
+        {origin === "USER" && (
+          <select value={visibility} onChange={(event) => setVisibility(event.target.value as VideoVisibility)} aria-label="공개 범위">
+            <option value="">공개·비공개 모두</option>
+            <option value="PUBLIC">공개</option>
+            <option value="PRIVATE">비공개</option>
+          </select>
+        )}
+        <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} aria-label="카테고리">
+          <option value="">모든 카테고리</option>
+          <option value="uncategorized">미분류 영상</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>{c.label}</option>
+          ))}
+        </select>
+        <select value={sort} onChange={(event) => setSort(event.target.value as VideoSort)} aria-label="정렬">
+          {VIDEO_SORT_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className={`select-all-button${isAllSelected ? " selected" : ""}`}
+          onClick={toggleSelectAll}
+          disabled={!videos.length}
+          title={isAllSelected ? "현재 페이지 전체 선택 해제" : "현재 페이지 모든 영상 선택"}
+        >
+          {isAllSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+          <span>{isAllSelected ? "선택 해제" : "전체 선택"}</span>
+        </button>
+        <span className="result-count">{total.toLocaleString()}개</span>
+      </div>
+
+      {selected.length > 0 && (
+        <div className="batch-bar">
+          <button
+            type="button"
+            className="select-toggle-btn button-reset"
+            onClick={toggleSelectAll}
+            title={isAllSelected ? "현재 페이지 전체 선택 해제" : "현재 페이지 모든 영상 선택"}
+          >
+            {isAllSelected ? <CheckSquare size={15} /> : <Square size={15} />}
+            <span>{isAllSelected ? "선택 해제" : "전체 선택"}</span>
+          </button>
+          <strong>{selected.length}개 선택</strong>
+          <button disabled={busy === "batch"} onClick={() => batch("APPROVED")}>승인</button>
+          <button disabled={busy === "batch"} onClick={() => batch("HIDDEN")}>숨김</button>
+          <button disabled={busy === "batch"} onClick={() => setBatchCategoryOpen(true)}>
+            <Tag size={14} style={{ marginRight: 4, verticalAlign: "middle" }} />카테고리 수정
+          </button>
+          <button disabled={busy === "batch"} onClick={() => batch("DELETE")} className="danger-text">삭제</button>
+        </div>
+      )}
+
+      {loading ? (
+        <VideoGridSkeleton count={6} />
+      ) : videos.length ? (
+        <div className="video-grid">
+          {videos.map((video) => (
+            <article className="video-card" key={video.id}>
+              <label className="video-check">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(video.id)}
+                  onChange={(event) =>
+                    setSelected((items) =>
+                      event.target.checked ? [...items, video.id] : items.filter((id) => id !== video.id)
+                    )
+                  }
+                />
+              </label>
+              <button className="thumbnail button-reset" onClick={() => setDetailId(video.id)}>
+                <img src={video.thumbnail_url} alt="" />
+                <span>{durationLabel(video.duration_seconds)}</span>
+              </button>
+              <div className="video-body">
+                <div className="video-badges">
+                  <span className={statusClass(video.status)}>{video.status}</span>
+                  <span className="score">{video.base_score}점</span>
+                  {video.caption_available && <span className="caption-badge">CC</span>}
+                  {video.created_by_user_id && (
+                    <span className="origin-badge" title={video.created_by || "사용자가 가져온 영상"}>사용자</span>
+                  )}
+                  {video.created_by_user_id && video.visibility === "PUBLIC" && (
+                    <span className="origin-badge public">공개됨</span>
+                  )}
+                  {video.categories && video.categories.map((c) => (
+                    <span key={c.id} className="category-badge">{c.label}</span>
+                  ))}
+                </div>
+                <h3>{video.title}</h3>
+                <p>{video.channel_title}</p>
+                <small>{dateLabel(video.published_at)}</small>
+                <div className="video-actions">
+                  <button className="icon-button" onClick={() => setDetailId(video.id)} aria-label="미리보기">
+                    <Eye size={17} />
+                  </button>
+                  <a className="icon-button" href={video.youtube_url} target="_blank" rel="noreferrer" aria-label="YouTube에서 열기">
+                    <ExternalLink size={17} />
+                  </a>
+                  <button className="reject-button" onClick={() => decide(video, "REJECTED")} disabled={busy === video.id}>
+                    <X size={17} /> 제외
+                  </button>
+                  <button className="approve-button" onClick={() => decide(video, "APPROVED")} disabled={busy === video.id}>
+                    <Check size={17} /> 승인
+                  </button>
+                  <button className="icon-danger" onClick={() => remove(video)} disabled={busy === video.id}>
+                    <Trash2 size={17} />
+                  </button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="조건에 맞는 영상이 없습니다" description="필터를 바꾸거나 새 후보를 수집해 보세요." />
+      )}
+
+      <Pagination page={page} pages={pages} setPage={setPage} />
+
+      {detailId && (
+        <VideoDetailModal
+          videoId={detailId}
+          categories={categories}
+          onClose={() => setDetailId("")}
+          onError={onError}
+          onNotice={onNotice}
+        />
+      )}
+
+      {batchCategoryOpen && (
+        <BatchCategoryModal
+          videoIds={selected}
+          categories={categories}
+          onClose={() => setBatchCategoryOpen(false)}
+          onSuccess={(msg) => {
+            setSelected([]);
+            onNotice(msg);
+          }}
+          onError={onError}
+          reload={reload}
+        />
+      )}
+    </section>
+  );
 }
 
 function VideoDetailModal({ videoId, categories, onClose, onError, onNotice }: { videoId: string; categories: FeedCategory[]; onClose: () => void; onError: (error: unknown) => void; onNotice: (message: string) => void }) {
@@ -1029,8 +1535,20 @@ function VideoDetailModal({ videoId, categories, onClose, onError, onNotice }: {
     )}<VideoCategoryEditor videoId={videoId} categories={categories} onError={onError} onNotice={onNotice} /><details><summary>Raw metadata</summary><pre>{JSON.stringify(video.raw_metadata || {}, null, 2)}</pre></details></div>}</Modal>;
 }
 
-function ExpressionsPanel(props: { expressions: Expression[]; total: number; page: number; setPage: (page: number) => void; search: string; setSearch: (value: string) => void; level: string; setLevel: (value: string) => void; reload: () => Promise<void>; onError: (error: unknown) => void }) {
-  const { expressions, total, page, setPage, search, setSearch, level, setLevel, reload, onError } = props;
+function ExpressionsPanel(props: {
+  expressions: Expression[];
+  total: number;
+  page: number;
+  setPage: (page: number) => void;
+  search: string;
+  setSearch: (value: string) => void;
+  level: string;
+  setLevel: (value: string) => void;
+  reload: () => Promise<void>;
+  onError: (error: unknown) => void;
+  loading?: boolean;
+}) {
+  const { expressions, total, page, setPage, search, setSearch, level, setLevel, reload, onError, loading } = props;
   const [editing, setEditing] = useState<Expression | "new" | null>(null);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   async function remove(expression: Expression) {
@@ -1050,14 +1568,16 @@ function ExpressionsPanel(props: { expressions: Expression[]; total: number; pag
           </button>
         </div>
         <div className="filters">
-          <SearchForm value={search} onSearch={setSearch} placeholder="표현, 뜻, 예문, 카테고리 검색" />
+          <SearchForm value={search} onSearch={setSearch} placeholder="표현, 뜻, 예문, 카테고리 검색" loading={loading} />
           <select value={level} onChange={(event) => setLevel(event.target.value)}>
             <option value="">모든 레벨</option>
             {LEVELS.map((item) => <option key={item}>{item}</option>)}
           </select>
           <span className="result-count">{total.toLocaleString()}개</span>
         </div>
-        {expressions.length ? (
+        {loading ? (
+          <TableSkeleton rows={6} />
+        ) : expressions.length ? (
           <div className="expression-table">
             {expressions.map((expression) => (
               <article key={expression.id}>
@@ -1299,8 +1819,9 @@ function TranscriptsPanel(props: {
   reload: () => Promise<void>;
   onError: (error: unknown) => void;
   onNotice: (message: string) => void;
+  loading?: boolean;
 }) {
-  const { stats, rows, total, page, setPage, search, setSearch, source, setSource, onlyStale, setOnlyStale, reload, onError, onNotice } = props;
+  const { stats, rows, total, page, setPage, search, setSearch, source, setSource, onlyStale, setOnlyStale, reload, onError, onNotice, loading } = props;
   const [detailId, setDetailId] = useState("");
   const [busy, setBusy] = useState("");
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -1390,7 +1911,7 @@ function TranscriptsPanel(props: {
           <button className="secondary-button" onClick={reload}><RefreshCw size={16} /> 새로고침</button>
         </div>
         <div className="filters">
-          <SearchForm value={search} onSearch={setSearch} placeholder="video ID 검색" />
+          <SearchForm value={search} onSearch={setSearch} placeholder="video ID 검색" loading={loading} />
           <select value={source} onChange={(event) => setSource(event.target.value)}>
             <option value="">모든 경로</option>
             {(stats?.by_source || []).map((item) => (
@@ -1403,7 +1924,9 @@ function TranscriptsPanel(props: {
           </label>
           <span className="result-count">{total.toLocaleString()}개</span>
         </div>
-        {rows.length ? (
+        {loading ? (
+          <TableSkeleton rows={6} />
+        ) : rows.length ? (
           <div className="transcript-list">
             {rows.map((row) => (
               <article className={row.stale ? "transcript-row stale" : "transcript-row"} key={row.video_id}>
@@ -1491,8 +2014,9 @@ function ReportsPanel(props: {
   confidence: string;
   setConfidence: (value: string) => void;
   reload: () => Promise<void>;
+  loading?: boolean;
 }) {
-  const { health, rows, total, page, setPage, search, setSearch, confidence, setConfidence, reload } = props;
+  const { health, rows, total, page, setPage, search, setSearch, confidence, setConfidence, reload, loading } = props;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const maxSessions = Math.max(1, ...(health?.daily || []).map((day) => day.sessions));
 
@@ -1574,7 +2098,7 @@ function ReportsPanel(props: {
           <button className="secondary-button" onClick={reload}><RefreshCw size={16} /> 새로고침</button>
         </div>
         <div className="filters">
-          <SearchForm value={search} onSearch={setSearch} placeholder="사용자 이메일 또는 이름" />
+          <SearchForm value={search} onSearch={setSearch} placeholder="사용자 이메일 또는 이름" loading={loading} />
           <select value={confidence} onChange={(event) => setConfidence(event.target.value)}>
             <option value="">모든 신뢰도</option>
             <option value="HIGH">HIGH</option>
@@ -1583,7 +2107,9 @@ function ReportsPanel(props: {
           </select>
           <span className="result-count">{total.toLocaleString()}건</span>
         </div>
-        {rows.length ? (
+        {loading ? (
+          <TableSkeleton rows={6} />
+        ) : rows.length ? (
           <div className="report-list">
             {rows.map((row) => (
               <article className="report-row" key={row.id}>
